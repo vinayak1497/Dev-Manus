@@ -1,0 +1,45 @@
+{
+  "name": "devops-safeguard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Intelligent Application & Infrastructure Monitoring Platform — Next.js frontend (Phase 1 foundation + Landing Page)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsc --noEmit && next lint",
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "test:unit": "tsc -p tsconfig.test.json && node --test \".test-build/tests/unit/*.test.js\"",
+    "test": "npm run test:unit",
+    "test:db": "powershell -NoProfile -ExecutionPolicy Bypass -File supabase\\tests\\run.ps1",
+    "test:db:sh": "bash supabase/tests/run.sh",
+    "db:types": "supabase gen types typescript --project-id afbuzhsnnczfawuwnglr --schema public > lib/supabase/database.types.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.48.0",
+    "motion": "^13.4.4",
+    "next": "14.2.13",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.16.10",
+    "@types/react": "18.3.5",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.13",
+    "postcss": "8.4.47",
+    "tailwindcss": "3.4.13",
+    "typescript": "5.6.2"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

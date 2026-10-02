@@ -1,0 +1,27 @@
+{
+  "//": "Compiles the PURE logic modules + their unit tests to CommonJS in .test-build so Node 22's built-in `node --test` can run them without a test-runner dependency. IO modules are typechecked by the main `tsc --noEmit`; here we only emit and run the pure cores (detection reconcile, remediation allowlist, AI schema + deterministic provider).",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2020",
+    "noEmit": false,
+    "outDir": ".test-build",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": false,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "lib/detection/**/*.ts",
+    "lib/remediation/**/*.ts",
+    "lib/ai/**/*.ts",
+    "lib/incidents.ts",
+    "lib/projects.ts",
+    "lib/onboarding/**/*.ts",
+    "tests/unit/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next", ".test-build"]
+}
