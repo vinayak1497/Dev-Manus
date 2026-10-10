@@ -31,6 +31,7 @@ import { PRODUCT_NAME } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { USER_ID_HEADER } from "@/lib/supabase/middleware";
 import { loadProjectConfig, type StoredProjectConfig } from "@/lib/project-config";
+import { readAutomaticMonitoringState } from "@/lib/monitoring/automatic-state";
 import {
   formatAbsoluteTime,
   formatRelativeTime,
@@ -193,6 +194,11 @@ export default async function ProjectDashboardPage({
   // before this table existed simply has no configuration to show.
   const { config: stored, schemaMissing: configSchemaMissing } =
     await loadProjectConfig(project.id);
+
+  // What automatic monitoring has ACTUALLY done, from the rows the worker
+  // wrote. Degrades to an all-unknown view rather than failing the page, and
+  // never claims a worker is running without evidence.
+  const automatic = await readAutomaticMonitoringState(supabase, project.id, now);
 
   return (
     <Shell>
@@ -387,7 +393,14 @@ export default async function ProjectDashboardPage({
         </SummaryCard>
       </div>
 
-      {stored ? <MonitoringConfiguration config={stored} /> : null}
+      {stored ? (
+        <MonitoringConfiguration
+          config={stored}
+          automatic={automatic}
+          now={now}
+          activeIncidents={activeIncidents.length}
+        />
+      ) : null}
 
       {operationalSchemaMissing ? null : (
         <Card className="p-5">

@@ -103,3 +103,65 @@ export function isBlockedAddress(address: string): boolean {
   // Not an IP literal — resolution decides; treat unparseable input as blocked.
   return true;
 }
+
+export type ExternalObservationInput = {
+  checkedUrl: string;
+  target: string | null;
+  path: string | null;
+  statusCode: number | null;
+  expectedStatus: number;
+  latencyMs: number;
+  classification: HttpCheckClassification;
+  checkedAt: string;
+};
+
+/**
+ * The persisted shape of one genuine external health check.
+ *
+ * Pure composer for the row `runConfiguredHttpCheck`
+ * (`app/projects/[id]/health-actions.ts`) inserts into
+ * `service_health_checks`. Centralized here — next to the classifier whose
+ * output it carries — so the detail/metadata contract (what is stored, and
+ * crucially what is NOT: no response body, no headers, no secrets) is
+ * unit-tested in one place instead of drifting between the action and tests.
+ * `project_id` / `service_id` are attached by the caller, which owns the DB.
+ */
+export type ExternalObservation = {
+  status: HttpCheckClassification["status"];
+  source: "external";
+  latencyMs: number;
+  errorRate: number;
+  detail: string;
+  metadata: {
+    target: string | null;
+    path: string | null;
+    checked_url: string;
+    status_code: number | null;
+    expected_status: number;
+  };
+  isDemo: false;
+  checkedAt: string;
+};
+
+export function buildExternalObservation(
+  input: ExternalObservationInput,
+): ExternalObservation {
+  const outcome =
+    input.statusCode === null ? "no response" : `HTTP ${input.statusCode}`;
+  return {
+    status: input.classification.status,
+    source: "external",
+    latencyMs: input.latencyMs,
+    errorRate: input.classification.errorRate,
+    detail: `GET ${input.checkedUrl} → ${outcome} in ${input.latencyMs}ms. ${input.classification.detail}.`,
+    metadata: {
+      target: input.target,
+      path: input.path,
+      checked_url: input.checkedUrl,
+      status_code: input.statusCode,
+      expected_status: input.expectedStatus,
+    },
+    isDemo: false,
+    checkedAt: input.checkedAt,
+  };
+}

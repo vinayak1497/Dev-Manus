@@ -44,6 +44,7 @@ next-env.d.ts
 /coverage
 /.nyc_output
 /.test-build
+/.worker-build
 /playwright-report
 /test-results
 /.playwright-cli

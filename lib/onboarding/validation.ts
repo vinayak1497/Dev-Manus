@@ -7,6 +7,29 @@ import { normalizeHealthPath, normalizeHealthTarget } from "./health";
 
 export type StepErrors = Record<string, string>;
 
+/**
+ * The stored health-configuration bounds, in one place.
+ *
+ * The wizard, the server boundary, and the automatic monitoring worker must
+ * agree on exactly which values are valid: exporting them here stops the
+ * runtime scheduler from quietly growing its own, looser rule set (RULE.md
+ * "do not introduce a second validation rule").
+ */
+export const HEALTH_INTERVAL_MIN_SEC = 10;
+export const HEALTH_INTERVAL_MAX_SEC = 3600;
+export const HEALTH_TIMEOUT_MIN_SEC = 1;
+export const HEALTH_TIMEOUT_MAX_SEC = 120;
+export const HEALTH_FAILURE_THRESHOLD_MIN = 1;
+export const HEALTH_FAILURE_THRESHOLD_MAX = 10;
+export const HEALTH_EXPECTED_STATUS_VALUES: readonly string[] = [
+  "200",
+  "201",
+  "202",
+  "204",
+  "301",
+  "302",
+];
+
 const NAME_MAX = 80;
 const DESC_MAX = 280;
 const TAG_MAX = 24;
@@ -161,15 +184,15 @@ export function validateHealth(s: WizardState): StepErrors {
     else if (!endpoint.value) e.endpoint = "Enter a health endpoint path, or switch method.";
   }
   const int = Number(s.health.intervalSec);
-  if (!Number.isInteger(int) || int < 10 || int > 3600)
+  if (!Number.isInteger(int) || int < HEALTH_INTERVAL_MIN_SEC || int > HEALTH_INTERVAL_MAX_SEC)
     e.intervalSec = "Interval must be 10–3600 seconds.";
   const to = Number(s.health.timeoutSec);
-  if (!Number.isInteger(to) || to < 1 || to > 120)
+  if (!Number.isInteger(to) || to < HEALTH_TIMEOUT_MIN_SEC || to > HEALTH_TIMEOUT_MAX_SEC)
     e.timeoutSec = "Timeout must be 1–120 seconds.";
   const ft = Number(s.health.failureThreshold);
-  if (!Number.isInteger(ft) || ft < 1 || ft > 10)
+  if (!Number.isInteger(ft) || ft < HEALTH_FAILURE_THRESHOLD_MIN || ft > HEALTH_FAILURE_THRESHOLD_MAX)
     e.failureThreshold = "Threshold must be 1–10.";
-  if (!["200", "201", "202", "204", "301", "302"].includes(s.health.expectedStatus.trim()))
+  if (!HEALTH_EXPECTED_STATUS_VALUES.includes(s.health.expectedStatus.trim()))
     e.expectedStatus = "Use a common success code (e.g. 200).";
   return e;
 }
@@ -230,10 +253,10 @@ export function validateOnboardingPayload(payload: {
   const interval = Number(payload.health.intervalSec);
   const timeout = Number(payload.health.timeoutSec);
   const threshold = Number(payload.health.failureThreshold);
-  if (!Number.isInteger(interval) || interval < 10 || interval > 3600) return "Check interval must be 10–3600 seconds.";
-  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 120) return "Timeout must be 1–120 seconds.";
-  if (!Number.isInteger(threshold) || threshold < 1 || threshold > 10) return "Failure threshold must be 1–10.";
-  if (!["200", "201", "202", "204", "301", "302"].includes(payload.health.expectedStatus.trim())) {
+  if (!Number.isInteger(interval) || interval < HEALTH_INTERVAL_MIN_SEC || interval > HEALTH_INTERVAL_MAX_SEC) return "Check interval must be 10–3600 seconds.";
+  if (!Number.isInteger(timeout) || timeout < HEALTH_TIMEOUT_MIN_SEC || timeout > HEALTH_TIMEOUT_MAX_SEC) return "Timeout must be 1–120 seconds.";
+  if (!Number.isInteger(threshold) || threshold < HEALTH_FAILURE_THRESHOLD_MIN || threshold > HEALTH_FAILURE_THRESHOLD_MAX) return "Failure threshold must be 1–10.";
+  if (!HEALTH_EXPECTED_STATUS_VALUES.includes(payload.health.expectedStatus.trim())) {
     return "Use a common success code (e.g. 200).";
   }
   return null;

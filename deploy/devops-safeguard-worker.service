@@ -1,0 +1,57 @@
+# DevOps Safeguard — automatic monitoring worker (systemd unit).
+#
+# Install on the EC2 host (see PHASE_2_MANUAL_TESTING_AND_DEPLOYMENT.md):
+#   sudo cp deploy/devops-safeguard-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now devops-safeguard-worker
+#
+# The worker is a plain Node.js process with no HTTP surface. systemd is its
+# process supervisor: it restarts the worker when it crashes, and the worker's
+# database-backed leases make sure a restart never duplicates or loses a check.
+
+[Unit]
+Description=DevOps Safeguard automatic monitoring worker
+Documentation=file:/opt/devops-safeguard/PHASE_2_MANUAL_TESTING_AND_DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as an unprivileged user that owns the checkout. Create it with:
+#   sudo useradd --system --home /opt/devops-safeguard --shell /usr/sbin/nologin devops-safeguard
+User=devops-safeguard
+Group=devops-safeguard
+WorkingDirectory=/opt/devops-safeguard
+# Server-side credentials live here and ONLY here. This file must be readable
+# by the service user and by nobody else (chmod 600, root:devops-safeguard).
+# See deploy/worker.env.example for the required variables.
+EnvironmentFile=/etc/devops-safeguard/worker.env
+ExecStart=/usr/bin/node /opt/devops-safeguard/.worker-build/worker/monitor-worker.js
+# A crashed worker must come back on its own; a clean exit (code 0, e.g. after
+# MONITOR_WORKER_ENABLED=false) must not be restarted into a loop.
+Restart=on-failure
+RestartSec=10
+# Prompt, supervised shutdown: SIGTERM first, then SIGKILL after the grace
+# period. The worker releases its own claims on SIGTERM, so a restart resumes
+# immediately instead of waiting out the lease.
+KillSignal=SIGTERM
+TimeoutStopSec=45
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=devops-safeguard-worker
+# Least privilege: the worker needs outbound HTTPS (targets + Supabase) and
+# nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

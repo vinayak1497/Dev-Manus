@@ -16,12 +16,15 @@
   },
   "include": [
     "lib/detection/**/*.ts",
+    "lib/monitoring/**/*.ts",
     "lib/remediation/**/*.ts",
     "lib/ai/**/*.ts",
     "lib/incidents.ts",
     "lib/projects.ts",
+    "lib/project-config-read.ts",
     "lib/onboarding/**/*.ts",
-    "tests/unit/**/*.ts"
+    "tests/unit/**/*.ts",
+    "tests/integration/**/*.ts"
   ],
   "exclude": ["node_modules", ".next", ".test-build"]
 }

@@ -55,6 +55,28 @@ export type ReconcileInput = {
   observedStatus: ServiceStatus | null;
   activeIncident: ActiveIncidentView | null;
   activeVerification: ActiveVerificationView | null;
+  /**
+   * Consecutive genuine failures and the configured threshold, supplied by
+   * the caller for a REAL external check.
+   *
+   * This is the stored `failureThreshold` finally being applied at runtime.
+   * It is deliberately an INPUT, not something this module looks up: the
+   * detection core stays pure and keeps no state of its own, and a caller
+   * that is not gating genuine external failures (demo setup, a controlled
+   * simulation, a plain manual monitor tick) simply omits it and gets the
+   * original "first bad reading opens an incident" behaviour unchanged.
+   */
+  failureGate?: FailureGate | null;
+};
+
+/**
+ * The configured "alert after N consecutive failures" policy for one service.
+ * `consecutiveFailures` counts only genuine external observations
+ * (`source='external'`, `is_demo=false`) — see lib/monitoring/failure-streak.ts.
+ */
+export type FailureGate = {
+  consecutiveFailures: number;
+  threshold: number;
 };
 
 export type ReconcileAction =
@@ -66,6 +88,19 @@ export type ReconcileAction =
       observedStatus: ServiceStatus;
     }
   | { type: "record_ongoing"; observedStatus: ServiceStatus }
+  | {
+      /**
+       * A genuine failure was observed and recorded, but the configured
+       * consecutive-failure threshold has not been reached yet. The service
+       * status still becomes the real observed status — hiding a real failure
+       * behind a "still healthy" badge would be the dishonest option
+       * (RULE.md 9.1/9.2) — only the incident decision waits.
+       */
+      type: "below_threshold";
+      observedStatus: ServiceStatus;
+      consecutiveFailures: number;
+      threshold: number;
+    }
   | { type: "begin_verification"; checksRequired: number }
   | { type: "advance_verification"; checksPassed: number; checksRequired: number }
   | { type: "reset_verification"; observedStatus: ServiceStatus }
@@ -97,6 +132,23 @@ export function reconcileService(input: ReconcileInput): ReconcileResult {
   // activeIncident when one already exists); anything else is a no-op.
   if (!input.activeIncident) {
     if (isUnhealthyStatus(observed)) {
+      // Applied threshold: the configured number of CONSECUTIVE genuine
+      // failures must be reached before an incident opens. Below it, the
+      // failure is still recorded and the service status still reflects it;
+      // only the incident decision waits. The gate never applies once an
+      // incident is open, so a flapping target can never open a second one.
+      const gate = input.failureGate;
+      if (gate && gate.consecutiveFailures < gate.threshold) {
+        return {
+          serviceStatus: observed,
+          action: {
+            type: "below_threshold",
+            observedStatus: observed,
+            consecutiveFailures: gate.consecutiveFailures,
+            threshold: gate.threshold,
+          },
+        };
+      }
       return {
         serviceStatus: observed,
         action: {

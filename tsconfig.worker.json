@@ -1,0 +1,24 @@
+{
+  "//": "Compiles ONLY the monitoring worker to CommonJS in .worker-build so it runs on a bare Node runtime (systemd on EC2) with no Next.js, no bundler and no loader flag. Everything it imports is plain TypeScript under lib/, reached through RELATIVE paths only: unlike the Next.js build, tsc does not rewrite the `@/` alias at emit time, so the worker deliberately never uses it.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2022",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "noEmit": false,
+    "outDir": ".worker-build",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": false,
+    "isolatedModules": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "plugins": []
+  },
+  "include": ["worker/**/*.ts"],
+  "exclude": ["node_modules", ".next", ".next-verify", ".test-build", ".worker-build"]
+}

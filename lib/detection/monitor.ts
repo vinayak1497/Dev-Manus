@@ -15,11 +15,19 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ServiceStatus } from "../incidents";
+import type { Json } from "../supabase/database.types";
+import { normalizeStoredHealth } from "../onboarding/stored-config";
+import { readFailureThreshold } from "../monitoring/health-settings";
+import {
+  readExternalFailureStreak,
+  type ExternalFailureStreak,
+} from "../monitoring/failure-streak";
 import {
   reconcileService,
   isUnhealthyStatus,
   type ReconcileResult,
   type ActiveIncidentView,
+  type FailureGate,
 } from "./reconcile";
 
 /** Worst-first ranking used to roll individual services up to a project. */
@@ -339,6 +347,9 @@ async function applyDecision(
     }
 
     case "record_ongoing":
+    // A real failure below the configured threshold: recorded on the service,
+    // deliberately NOT escalated to an incident. Nothing to persist here.
+    case "below_threshold":
     case "none":
     default:
       return { created: 0, resolved: 0 };
@@ -376,6 +387,19 @@ export async function runMonitorTick(
     .eq("id", projectId)
     .maybeSingle();
   const deployment = (projectRow as DeploymentSnapshot | null) ?? null;
+
+  // The configured "alert after N consecutive failures" policy, read once per
+  // project pass. It is only ever APPLIED to a genuine external observation —
+  // a demo scenario or a controlled simulation keeps Phase 1's behaviour.
+  const { data: configRow } = await supabase
+    .from("project_configs")
+    .select("health")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  const storedHealth = normalizeStoredHealth(
+    ((configRow as { health?: Json | null } | null)?.health ?? null) as Json | null,
+  );
+  const failureThreshold = readFailureThreshold(storedHealth);
 
   let createdIncidents = 0;
   let resolvedIncidents = 0;
@@ -415,6 +439,32 @@ export async function runMonitorTick(
         checked_at: now,
       });
     }
+    // Apply the configured failure threshold ONLY to a service that is genuinely
+    // monitored, i.e. one that has at least one real external observation.
+    //
+    // Note this deliberately does NOT depend on the newest row being the
+    // external one: `runMonitorTick` writes a `monitor probe` self-copy row
+    // above whenever a service is unhealthy or has an open incident, and that
+    // row becomes the newest one. Reading the streak from the genuine
+    // `source='external'` history keeps the threshold enforced across those
+    // self-copies instead of silently reverting to "first bad reading acts".
+    // Demo services never contribute genuine observations, so they keep
+    // Phase 1's behaviour exactly.
+    let failureGate: FailureGate | null = null;
+    if (!service.is_demo) {
+      const streak: ExternalFailureStreak = await readExternalFailureStreak(
+        supabase,
+        service.id,
+        failureThreshold,
+      );
+      if (streak.lastCheckedAt !== null) {
+        failureGate = {
+          consecutiveFailures: streak.consecutiveFailures,
+          threshold: failureThreshold,
+        };
+      }
+    }
+
     const result = reconcileService({
       service: {
         id: service.id,
@@ -437,6 +487,7 @@ export async function runMonitorTick(
             checksPassed: verification.checks_passed,
           }
         : null,
+      failureGate,
     });
 
     const counts = await applyDecision(

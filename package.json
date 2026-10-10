@@ -13,6 +13,10 @@
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "test:unit": "tsc -p tsconfig.test.json && node --test \".test-build/tests/unit/*.test.js\"",
     "test": "npm run test:unit",
+    "test:e2e": "tsc -p tsconfig.test.json && node --test \".test-build/tests/integration/*.test.js\"",
+    "worker:build": "tsc -p tsconfig.worker.json",
+    "worker": "npm run worker:build && node .worker-build/worker/monitor-worker.js",
+    "worker:once": "npm run worker:build && node .worker-build/worker/monitor-worker.js --once",
     "test:db": "powershell -NoProfile -ExecutionPolicy Bypass -File supabase\\tests\\run.ps1",
     "test:db:sh": "bash supabase/tests/run.sh",
     "db:types": "supabase gen types typescript --project-id afbuzhsnnczfawuwnglr --schema public > lib/supabase/database.types.ts"

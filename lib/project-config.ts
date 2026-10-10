@@ -1,11 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { isMissingSchema } from "@/lib/incidents";
-import {
-  normalizeStoredConfig,
-  type StoredConfigRow,
-  type StoredEnvRow,
-  type StoredProjectConfig,
-} from "./onboarding/stored-config";
+import { readProjectConfig } from "./project-config-read";
+import type { StoredProjectConfig } from "./onboarding/stored-config";
 
 export type {
   MonitoringStatus,
@@ -27,6 +22,10 @@ export type {
  * what was actually being monitored (RULE.md — no field may exist that the
  * application silently ignores).
  *
+ * The Supabase query itself lives in `lib/project-config-read.ts` with an
+ * injected client, so this Next.js wrapper and the unattended monitoring
+ * worker share exactly one implementation of "what did onboarding store?".
+ *
  * Secret safety: the env-var query selects `key, is_secret, has_value` ONLY.
  * The `value` column is never requested, so a secret value cannot reach the
  * server component even if a row were malformed. `project_env_vars.value` is
@@ -46,38 +45,5 @@ export async function loadProjectConfig(
 ): Promise<{ config: StoredProjectConfig | null; schemaMissing: boolean }> {
   const supabase = await createClient().catch(() => null);
   if (!supabase) return { config: null, schemaMissing: false };
-
-  const [configResult, envResult] = await Promise.all([
-    supabase
-      .from("project_configs")
-      .select(
-        "monitoring_status, branch, repository_provider, deployment, runtime, dependencies, health",
-      )
-      .eq("project_id", projectId)
-      .maybeSingle(),
-    // NOTE: `value` is intentionally absent from this select list.
-    supabase
-      .from("project_env_vars")
-      .select("key, is_secret, has_value")
-      .eq("project_id", projectId),
-  ]);
-
-  if (configResult.error && isMissingSchema(configResult.error.code)) {
-    return { config: null, schemaMissing: true };
-  }
-  if (envResult.error && isMissingSchema(envResult.error.code)) {
-    return { config: null, schemaMissing: true };
-  }
-
-  // RLS hides other tenants' rows; a missing config row is an honest "not
-  // configured yet" rather than an error.
-  if (!configResult.data) return { config: null, schemaMissing: false };
-
-  return {
-    config: normalizeStoredConfig(
-      configResult.data as StoredConfigRow,
-      (envResult.data ?? []) as StoredEnvRow[],
-    ),
-    schemaMissing: false,
-  };
+  return readProjectConfig(supabase, projectId);
 }

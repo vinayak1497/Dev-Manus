@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -298,6 +298,7 @@ export type Database = {
           deployment: Json | null
           description: string | null
           health: Json | null
+          monitoring_enabled: boolean
           monitoring_status: string
           project_id: string
           repository_provider: string | null
@@ -313,6 +314,7 @@ export type Database = {
           deployment?: Json | null
           description?: string | null
           health?: Json | null
+          monitoring_enabled?: boolean
           monitoring_status?: string
           project_id: string
           repository_provider?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           deployment?: Json | null
           description?: string | null
           health?: Json | null
+          monitoring_enabled?: boolean
           monitoring_status?: string
           project_id?: string
           repository_provider?: string | null
@@ -650,6 +653,13 @@ export type Database = {
           id: string
           is_demo: boolean
           kind: string | null
+          monitoring_last_check_at: string | null
+          monitoring_last_error: string | null
+          monitoring_last_status: string | null
+          monitoring_lease_expires_at: string | null
+          monitoring_next_check_at: string | null
+          monitoring_run_id: string | null
+          monitoring_worker_id: string | null
           name: string
           project_id: string
           status: string | null
@@ -660,6 +670,13 @@ export type Database = {
           id?: string
           is_demo?: boolean
           kind?: string | null
+          monitoring_last_check_at?: string | null
+          monitoring_last_error?: string | null
+          monitoring_last_status?: string | null
+          monitoring_lease_expires_at?: string | null
+          monitoring_next_check_at?: string | null
+          monitoring_run_id?: string | null
+          monitoring_worker_id?: string | null
           name: string
           project_id: string
           status?: string | null
@@ -670,6 +687,13 @@ export type Database = {
           id?: string
           is_demo?: boolean
           kind?: string | null
+          monitoring_last_check_at?: string | null
+          monitoring_last_error?: string | null
+          monitoring_last_status?: string | null
+          monitoring_lease_expires_at?: string | null
+          monitoring_next_check_at?: string | null
+          monitoring_run_id?: string | null
+          monitoring_worker_id?: string | null
           name?: string
           project_id?: string
           status?: string | null
