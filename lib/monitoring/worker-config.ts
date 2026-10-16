@@ -15,6 +15,10 @@
  */
 import { hostname } from "node:os";
 import type { LogLevel } from "./worker-log";
+import {
+  parseTrustedPrivateHosts,
+  TRUSTED_PRIVATE_HOSTS_ENV,
+} from "./trusted-targets";
 
 export type WorkerEnvironment = Record<string, string | undefined>;
 
@@ -33,6 +37,14 @@ export type WorkerConfig = {
   /** One pass and exit, instead of running forever. */
   once: boolean;
   enabled: boolean;
+  /**
+   * Exact hosts/IPs excused from the private-address refusal
+   * (`MONITOR_ALLOWED_PRIVATE_HOSTS`). Empty means default-deny, exactly as
+   * before. Operator configuration only — never user-supplied.
+   */
+  trustedPrivateHosts: string[];
+  /** Informational build marker for deploy correspondence checks (may be null). */
+  buildSha: string | null;
 };
 
 export type WorkerConfigResult =
@@ -171,6 +183,21 @@ export function loadWorkerConfig(
   );
   const logLevel = readLogLevel(env, warnings);
 
+  // Explicit operator opt-in for private monitoring targets. Absent or blank
+  // means default-deny (previous behaviour). A malformed entry fails startup:
+  // a half-understood exception list must never silently narrow or widen.
+  const trusted = parseTrustedPrivateHosts(env[TRUSTED_PRIVATE_HOSTS_ENV]);
+  for (const problem of trusted.errors) {
+    errors.push(`${TRUSTED_PRIVATE_HOSTS_ENV}: ${problem}`);
+  }
+
+  // Informational only: lets the startup log prove which source revision the
+  // running worker was built from. Never required, never secret.
+  const buildShaRaw = env.WORKER_BUILD_SHA?.trim() ?? "";
+  if (buildShaRaw.length > 128) {
+    errors.push("WORKER_BUILD_SHA must be 128 characters or fewer.");
+  }
+
   if (errors.length > 0) return { ok: false, errors };
 
   return {
@@ -191,6 +218,8 @@ export function loadWorkerConfig(
       logLevel,
       once: readBool(env, "MONITOR_WORKER_ONCE", false),
       enabled: readBool(env, "MONITOR_WORKER_ENABLED", true),
+      trustedPrivateHosts: trusted.hosts,
+      buildSha: buildShaRaw || null,
     },
   };
 }
@@ -209,5 +238,9 @@ export function describeWorkerConfig(config: WorkerConfig): Record<string, unkno
     projectId: config.projectId,
     mode: config.once ? "single-pass" : "continuous",
     supabaseUrl: config.supabaseUrl,
+    // Addressing, not secrets: the operator confirms the exact trusted target
+    // from the startup log. Count plus entries (empty means default-deny).
+    trustedPrivateHosts: config.trustedPrivateHosts,
+    buildSha: config.buildSha ?? "not recorded",
   };
 }

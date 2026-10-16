@@ -97,6 +97,11 @@ export type SchedulerOptions = {
   /** Maximum checks in flight at once. Bounded on purpose. */
   concurrency?: number;
   log?: SchedulerLogger;
+  /**
+   * Operator-configured trusted private hosts (worker env allowlist).
+   * Absent or empty means default-deny, exactly as before.
+   */
+  trustedPrivateHosts?: readonly string[];
 };
 
 export const DEFAULT_BATCH_LIMIT = 200;
@@ -328,6 +333,7 @@ export async function runSchedulerTick(options: SchedulerOptions): Promise<Sched
     leaseSeconds = DEFAULT_LEASE_SECONDS,
     concurrency = DEFAULT_CONCURRENCY,
     log,
+    trustedPrivateHosts = [],
   } = options;
 
   const result: SchedulerTickResult = {
@@ -436,6 +442,7 @@ export async function runSchedulerTick(options: SchedulerOptions): Promise<Sched
         serviceId: service.id,
         observationId: runId,
         userId: null,
+        trustedPrivateHosts,
       });
 
       // Record the failure and schedule a bounded retry. `retryClaimedCheck` only

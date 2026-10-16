@@ -14,6 +14,7 @@ import {
   retryClaimedCheck,
 } from "@/lib/monitoring/claims";
 import { readIntervalSec } from "@/lib/monitoring/health-settings";
+import { parseTrustedPrivateHosts } from "@/lib/monitoring/trusted-targets";
 import { retryDelaySeconds } from "@/lib/monitoring/scheduler";
 import {
   activeIncidentOnService,
@@ -55,6 +56,21 @@ import {
 /** How long a manual check may hold the service while it runs. */
 const MANUAL_LEASE_SECONDS = 120;
 
+/**
+ * Trusted private hosts for manual checks: the same server-side allowlist
+ * the worker uses. Returns the parsed list, or throws a fail-closed,
+ * operator-facing error when the configuration itself is malformed.
+ */
+function readManualTrustedHosts(): readonly string[] {
+  const parsed = parseTrustedPrivateHosts(process.env.MONITOR_ALLOWED_PRIVATE_HOSTS);
+  if (parsed.errors.length > 0) {
+    throw new Error(
+      `The monitoring trust configuration is invalid: ${parsed.errors.join(" ")}`,
+    );
+  }
+  return parsed.hosts;
+}
+
 export async function runConfiguredHttpCheck(
   projectId: string,
 ): Promise<ActionResult> {
@@ -87,6 +103,18 @@ export async function runConfiguredHttpCheck(
   if ("error" in resolved) return { ok: false, error: resolved.error };
   const serviceId = resolved.id;
 
+  // Same server-side trust policy the worker uses, validated BEFORE claiming
+  // so a malformed allowlist fails closed without holding the service lease.
+  let trustedPrivateHosts: readonly string[];
+  try {
+    trustedPrivateHosts = readManualTrustedHosts();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "The monitoring trust configuration is invalid.",
+    };
+  }
+
   const workerId = `manual:${userId}`;
   const runId = randomUUID();
   const claimed = await claimManualCheck(
@@ -104,12 +132,14 @@ export async function runConfiguredHttpCheck(
     };
   }
 
+  // Same server-side trust policy the worker uses (validated above).
   const result = await runConfiguredHttpCheckCore({
     supabase,
     projectId,
     serviceId,
     observationId: runId,
     userId,
+    trustedPrivateHosts,
   });
 
   const intervalSec = readIntervalSec(health);

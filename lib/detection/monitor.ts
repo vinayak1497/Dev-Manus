@@ -198,6 +198,13 @@ async function applyDecision(
 
   switch (action.type) {
     case "open_incident": {
+      // NOTE on concurrency: two ticks can both read "no active incident"
+      // and both insert. The partial unique index
+      // `incidents_one_active_per_service` makes the loser fail with 23505,
+      // in which case `inc` is null and we return created:0 — the existing
+      // incident stands and the pass still succeeds. That is normal
+      // deduplication, not a failure. (Any other write problem is likewise
+      // non-fatal to the pass: the next due tick re-reads and reconciles.)
       const { data: inc } = await supabase
         .from("incidents")
         .insert({
@@ -253,6 +260,10 @@ async function applyDecision(
 
     case "begin_verification": {
       if (!ctx.activeIncidentId) return { created: 0, resolved: 0 };
+      // NOTE on concurrency: like `open_incident` above, the partial unique
+      // index `verification_runs_one_running_per_incident` turns a lost race
+      // into a null `run` (23505). We then attach the winner's id (re-read
+      // below) so the timeline still links the running verification.
       const { data: run } = await supabase
         .from("verification_runs")
         .insert({
@@ -266,6 +277,18 @@ async function applyDecision(
         })
         .select("id")
         .single();
+      let verificationRunId: string | null = run ? run.id : null;
+      if (!verificationRunId) {
+        const { data: existing } = await supabase
+          .from("verification_runs")
+          .select("id")
+          .eq("incident_id", ctx.activeIncidentId)
+          .eq("status", "running")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        verificationRunId = ((existing as { id: string } | null) ?? null)?.id ?? null;
+      }
       await supabase
         .from("incidents")
         .update({ status: "monitoring" })
@@ -276,7 +299,7 @@ async function applyDecision(
         message: `Recovery observed — verifying (1/${action.checksRequired}).`,
         actor: "system",
         is_demo: isDemo,
-        metadata: run ? { verification_run_id: run.id } : null,
+        metadata: verificationRunId ? { verification_run_id: verificationRunId } : null,
       });
       return { created: 0, resolved: 0 };
     }

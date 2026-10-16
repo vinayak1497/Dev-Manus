@@ -105,6 +105,8 @@ Configuration (environment):
   MONITOR_WORKER_LEASE_SECONDS    default 120 (30-3600)
   MONITOR_WORKER_ID               default worker-<host>-<pid>
   MONITOR_WORKER_PROJECT_ID       default: all enabled projects
+  MONITOR_ALLOWED_PRIVATE_HOSTS     default: unset (private targets refused)
+  WORKER_BUILD_SHA                  default: unset (startup log shows "not recorded")
   LOG_LEVEL                       default info (debug|info|warn|error)
 `;
 
@@ -218,6 +220,7 @@ function passBackoffMs(consecutiveFailures: number): number {
         batchLimit: config.batchLimit,
         leaseSeconds: config.leaseSeconds,
         concurrency: config.concurrency,
+        trustedPrivateHosts: config.trustedPrivateHosts,
         log: (level, message, fields) => log[level](message, fields),
       });
       log[result.ok ? "info" : "warn"]("worker.pass_completed", {

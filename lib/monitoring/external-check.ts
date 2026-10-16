@@ -35,6 +35,10 @@ import {
   isBlockedHostname,
   type HttpCheckClassification,
 } from "./http-check";
+import {
+  evaluateTrustedAccess,
+  isTrustedHost,
+} from "./trusted-targets";
 import { readExpectedStatus, readTimeoutSec } from "./health-settings";
 
 /**
@@ -54,18 +58,53 @@ export const MONITORED_SERVICE_KIND = "http-endpoint";
  * - after resolution EVERY address must be public, so a public name that
  *   points at a private address is refused too.
  *
+ * Explicit operator exception: when `trustedPrivateHosts` (parsed from the
+ * worker-side `MONITOR_ALLOWED_PRIVATE_HOSTS`, never user-supplied) contains
+ * the exact hostname, `evaluateTrustedAccess` may excuse a bypassable private
+ * address — loopback, link-local, multicast, documentation ranges, and unsafe
+ * hostnames stay refused. Absent or empty means default-deny, exactly as
+ * before.
+ *
+ * DNS-rebinding note: this validates the pre-flight lookup result. For IP
+ * literals (the recommended trusted form) the lookup returns the literal
+ * itself, so there is no lookup-vs-connect window. `fetch` still resolves at
+ * connect time for DNS names; prefer literals for trusted targets and see the
+ * demo runbook for the residual limitation.
+ *
  * Returns `null` when the target is acceptable, or an operator-facing reason
- * when it is not. Never throws.
+ * when it is not. Never throws. The `lookup` override exists only so tests
+ * can drive DNS edge cases without network access.
  */
-export async function resolvePublicHost(hostname: string): Promise<string | null> {
+export type ResolvePublicHostOptions = {
+  trustedPrivateHosts?: readonly string[];
+  lookup?: (hostname: string) => Promise<readonly { address: string }[]>;
+};
+
+export async function resolvePublicHost(
+  hostname: string,
+  options: ResolvePublicHostOptions = {},
+): Promise<string | null> {
   if (isBlockedHostname(hostname)) return `Refusing to check internal target "${hostname}".`;
-  let records: { address: string }[];
+  const trusted = options.trustedPrivateHosts ?? [];
+  let records: readonly { address: string }[];
   try {
-    records = await lookup(hostname, { all: true });
+    records = options.lookup ? await options.lookup(hostname) : await lookup(hostname, { all: true });
   } catch {
     return `Monitoring target "${hostname}" does not resolve.`;
   }
   if (records.length === 0) return `Monitoring target "${hostname}" does not resolve.`;
+  if (trusted.length > 0 && isTrustedHost(hostname, trusted)) {
+    const verdict = evaluateTrustedAccess(
+      hostname,
+      records.map((record) => record.address),
+      trusted,
+    );
+    if (verdict.allowed) return null;
+    // Trusted hostname, untrusted resolution: fail closed with a reason that
+    // names the policy (never the allowlist contents), and keep the
+    // "Refusing" prefix so the scheduler treats it as a configuration retry.
+    return `Refusing to check "${hostname}" under the trusted-target policy: ${verdict.reason}.`;
+  }
   for (const record of records) {
     if (isIP(record.address) === 0 || isBlockedAddress(record.address)) {
       return `Refusing to check non-public target "${hostname}".`;
@@ -170,6 +209,12 @@ export type RunExternalCheckOptions = {
    * runs, which is exactly what "detected by the system" should look like.
    */
   userId?: string | null;
+  /**
+   * Operator-configured trusted private hosts (parsed from the worker-side
+   * `MONITOR_ALLOWED_PRIVATE_HOSTS`, never user-supplied). Absent or empty
+   * means default-deny, exactly as before.
+   */
+  trustedPrivateHosts?: readonly string[];
 };
 
 /**
@@ -232,7 +277,9 @@ export async function runConfiguredHttpCheckCore(
   if (url.username !== "" || url.password !== "") {
     return { ...empty, error: "Refusing to check a target URL with credentials." };
   }
-  const blocked = await resolvePublicHost(url.hostname);
+  const blocked = await resolvePublicHost(url.hostname, {
+    trustedPrivateHosts: options.trustedPrivateHosts ?? [],
+  });
   if (blocked) return { ...empty, error: blocked };
 
   let serviceId = options.serviceId ?? null;

@@ -88,6 +88,10 @@ function isPrivateIPv4(address: string): boolean {
 
 function isPrivateIPv6(address: string): boolean {
   const lower = address.toLowerCase();
+  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1): without this, the mapped
+  // loopback reads as "public". Fail closed — the trusted-target path
+  // re-evaluates the embedded IPv4 form for exact entries.
+  if (lower.startsWith("::ffff:")) return true;
   if (lower === "::1" || lower === "::") return true;
   if (lower.startsWith("fe80:")) return true;
   if (lower.startsWith("fc") || lower.startsWith("fd")) return true;

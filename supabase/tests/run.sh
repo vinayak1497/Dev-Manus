@@ -48,6 +48,7 @@ FILES=(
   "migrations/20261002000000_detection_and_verification.sql"
   "migrations/20261003000000_project_onboarding.sql"
   "migrations/20261004000000_automatic_monitoring.sql"
+  "migrations/20261005000000_incident_dedup_guards.sql"
 )
 for f in "${FILES[@]}"; do
   run_file "$ROOT/$f" || { echo "==> FAILED applying $f"; exit 1; }
@@ -62,6 +63,7 @@ run_file "$ROOT/tests/01_rls_and_telemetry.sql" || { echo "==> FAILED (phase 1)"
 run_file "$ROOT/tests/02_incident_domain_rls.sql" || { echo "==> FAILED (phase 2)"; exit 1; }
 run_file "$ROOT/tests/03_onboarding_rls.sql" || { echo "==> FAILED (onboarding)"; exit 1; }
 run_file "$ROOT/tests/04_automatic_monitoring.sql" || { echo "==> FAILED (automatic monitoring)"; exit 1; }
+run_file "$ROOT/tests/05_dedup_guards.sql" || { echo "==> FAILED (dedup guards)"; exit 1; }
 
 echo ""
 echo "==> PASSED - migrations apply cleanly and RLS behaves correctly"

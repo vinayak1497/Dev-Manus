@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { DependencyBadge } from "@/components/onboarding/ProvenanceBadge";
 import { deploymentStrategyLabel } from "@/lib/onboarding/deployment";
 import { buildHealthCheckUrl, HEALTH_TARGET_TYPE_LABEL } from "@/lib/onboarding/health";
+import { isBlockedAddress } from "@/lib/monitoring/http-check";
 import type { DependencyStatus, HealthTargetType } from "@/lib/onboarding/types";
 import { formatRelativeTime } from "@/lib/projects";
 import type { AutomaticMonitoringView } from "@/lib/monitoring/automatic-state";
@@ -203,6 +204,22 @@ export function MonitoringConfiguration({
   const runtime = config.runtime;
 
   const checkUrl = health && health.method === "http" ? buildHealthCheckUrl(health.targetUrl ?? "", health.endpoint ?? "").url : null;
+  // Static (no-DNS) eligibility hint: a private/internal literal can only be
+  // fetched when the worker host explicitly trusts that exact host via
+  // MONITOR_ALLOWED_PRIVATE_HOSTS. Entering the IP in onboarding does NOT
+  // trust it — this note must never read as "will be monitored".
+  const privateTargetNote = (() => {
+    if (!health || health.method !== "http" || !health.targetUrl) return null;
+    try {
+      const hostname = new URL(health.targetUrl).hostname;
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) && isBlockedAddress(hostname)) {
+        return hostname;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
   const dependencyRows = deps
     ? (Object.keys(DEP_LABEL) as DepKey[]).map((key) => ({
         key,
@@ -282,6 +299,15 @@ export function MonitoringConfiguration({
                   <Row label="Target URL" value={health.targetUrl ?? "Not set"} />
                   <Row label="Endpoint path" value={health.endpoint ?? "Not set"} />
                   <Row label="Checked URL" value={checkUrl ?? "Not set"} />
+                  {privateTargetNote ? (
+                    <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
+                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      Private target ({privateTargetNote}): the worker refuses
+                      it unless that exact host is listed in
+                      MONITOR_ALLOWED_PRIVATE_HOSTS on the worker host. Until
+                      then, checks are refused and no incident can be created.
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <Row
