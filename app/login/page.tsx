@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Lock, Mail, ShieldCheck } from "lucide-react";
 import { AnimatedForm } from "@/components/ui/auth";
 import { AuthShell, GoogleIcon } from "@/components/auth/AuthShell";
 import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
@@ -120,7 +121,7 @@ function LoginForm() {
   if (isLoading) {
     return (
       <AuthShell orbitWord="Welcome.">
-        <p role="status" className="text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           Checking your session…
         </p>
       </AuthShell>
@@ -130,7 +131,7 @@ function LoginForm() {
   if (user) {
     return (
       <AuthShell orbitWord="Welcome.">
-        <p role="status" className="text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           You&apos;re already signed in — taking you to your projects…
         </p>
       </AuthShell>
@@ -140,7 +141,7 @@ function LoginForm() {
   if (!isConfigured) {
     return (
       <AuthShell orbitWord="Welcome.">
-        <p role="status" className="max-w-sm text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           {CONFIG_NOTICE}
         </p>
       </AuthShell>
@@ -151,6 +152,7 @@ function LoginForm() {
     <AuthShell orbitWord="Welcome.">
       {step === "credentials" ? (
         <AnimatedForm
+          icon={<ShieldCheck size={22} />}
           header="Welcome back"
           subHeader="Sign in to your DevOps Safeguard account."
           fields={[
@@ -159,6 +161,7 @@ function LoginForm() {
               required: true,
               type: "email",
               placeholder: "Enter your email address",
+              icon: <Mail size={16} />,
               onChange: (event) => setEmail(event.target.value),
             },
             {
@@ -166,6 +169,7 @@ function LoginForm() {
               required: true,
               type: "password",
               placeholder: "Enter your password",
+              icon: <Lock size={16} />,
               onChange: () => {},
             },
           ]}
@@ -202,7 +206,15 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <AuthShell orbitWord="Welcome.">
+          <p role="status" className="auth-sub">
+            Checking your session…
+          </p>
+        </AuthShell>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

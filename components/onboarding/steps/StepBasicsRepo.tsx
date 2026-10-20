@@ -1,7 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
+import { GitBranch } from "lucide-react";
 import { WIZARD_ENVIRONMENTS, type WizardState } from "@/lib/onboarding/types";
 import { EnvironmentHelp } from "../EnvironmentHelp";
-import { Field, Hint, SectionCard, areaClass, inputClass } from "../StepFields";
+import { Field, Hint, OptionCard, SectionCard, areaClass, inputClass } from "../StepFields";
 
 export type StepProps = {
   state: WizardState;
@@ -22,15 +23,10 @@ export function StepBasics({ state, setState, errors }: StepProps) {
   const b = state.basics;
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Project basics
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          Name your project so the team recognises it. Everything here can be
-          changed later in Settings.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        Name your project so the team recognises it. Everything here can be
+        changed later in Settings.
+      </p>
 
       <Field label="Project name" htmlFor="ob-name" error={errors.name} required>
         <input
@@ -102,22 +98,18 @@ export function StepBasics({ state, setState, errors }: StepProps) {
           {WIZARD_ENVIRONMENTS.map((env) => {
             const selected = b.environment === env;
             return (
-              <button
+              <OptionCard
                 key={env}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() =>
+                selected={selected}
+                label={`Environment: ${env}`}
+                onSelect={() =>
                   setState((s) => ({ ...s, basics: { ...s.basics, environment: env } }))
                 }
-                className={
-                  selected
-                    ? "rounded border border-brand bg-brand-light px-3 py-2.5 text-[13px] font-semibold text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                    : "rounded border border-border-hairline bg-surface px-3 py-2.5 text-[13px] font-medium text-ink-secondary hover:border-ink-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                }
               >
-                {env}
-              </button>
+                <span className="block py-0.5 text-center text-[13px] font-semibold text-ink">
+                  {env}
+                </span>
+              </OptionCard>
             );
           })}
         </div>
@@ -131,20 +123,16 @@ export function StepRepository({ state, setState, errors }: StepProps) {
   const r = state.repository;
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Connect your repository
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          Paste a repository URL so analysis can read what is really there.
-          A public GitHub URL is inspected automatically. Without one you can
-          still finish setup and configure everything by hand.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        Paste a repository URL so analysis can read what is really there.
+        A public GitHub URL is inspected automatically. Without one you can
+        still finish setup and configure everything by hand.
+      </p>
 
       <SectionCard
         title="GitHub — Not connected"
         description="Add a public repository URL and the wizard inspects it for you. Don't have a public repository? You can continue and configure the project manually."
+        icon={<GitBranch className="h-4 w-4" aria-hidden="true" />}
       >
         <Field label="Repository URL" htmlFor="ob-repo" error={errors.url} hint="Optional">
           <input

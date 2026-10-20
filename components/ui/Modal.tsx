@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,14 @@ const FOCUSABLE = [
 const EXIT_MS = 150;
 
 /**
+ * Open dialogs, oldest first. Nested dialogs each register a document-level
+ * keydown listener, so without this both would react to one Escape key press
+ * and close the whole stack at once. Only the topmost dialog may act.
+ */
+const dialogStack: symbol[] = [];
+const isTopmostDialog = (id: symbol) => dialogStack[dialogStack.length - 1] === id;
+
+/**
  * The product's single modal shell (Design.md Level 3 elevation: muted
  * `bg-ink/40` backdrop with a 4px blur, Level 2 `shadow-raised` panel,
  * 16px radius, hairline border).
@@ -28,6 +37,14 @@ const EXIT_MS = 150;
  * - Focus moves into the panel on open and returns to the previously focused
  *   element (the trigger) on close.
  * - Tab is trapped inside the panel so focus cannot land behind the dialog.
+ *
+ * The overlay is portalled to `document.body` on purpose. A dialog opened from
+ * inside another dialog (e.g. the environment help card inside the onboarding
+ * wizard) must cover the viewport, not sit inside its opener's scrolling
+ * region. Any ancestor with a `transform`, `filter`, or `contain` becomes the
+ * containing block for `position: fixed` children, which would otherwise clip
+ * and mis-centre the nested dialog — and focusing it would scroll the opener
+ * out of view.
  *
  * Transitions are CSS-driven on purpose. A JS animation driver (motion /
  * Web Animations) writes its `initial` opacity as an inline style and only
@@ -48,6 +65,13 @@ export function Modal({
   /** Panel sizing/padding. Defaults to the wizard's proportions. */
   panelClassName,
   closeLabel = "Close",
+  /**
+   * Hide the shell's own close button. Used when the panel content owns the
+   * single close control itself (e.g. the onboarding wizard header), so two
+   * competing close buttons never appear. Defaults to false — every other
+   * caller keeps the shell button.
+   */
+  hideCloseButton = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -56,10 +80,19 @@ export function Modal({
   children: ReactNode;
   panelClassName?: string;
   closeLabel?: string;
+  hideCloseButton?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(open);
   const [entered, setEntered] = useState(false);
+  // Null on the server and on the first client render, so the markup matches
+  // during hydration; set once mounted on the client.
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+  const dialogId = useRef<symbol>(Symbol("modal"));
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
 
   // Drive the enter/exit transition. `setTimeout` (not rAF) so the flip still
   // happens while the tab is backgrounded.
@@ -99,9 +132,13 @@ export function Modal({
   }, []);
 
   // Escape closes; Tab is trapped so focus cannot escape behind the dialog.
+  // Only the topmost dialog reacts, so a nested dialog closes on its own.
   useEffect(() => {
     if (!open) return;
+    const id = dialogId.current;
+    dialogStack.push(id);
     const onKey = (event: KeyboardEvent) => {
+      if (!isTopmostDialog(id)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
@@ -129,12 +166,16 @@ export function Modal({
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      const at = dialogStack.indexOf(id);
+      if (at !== -1) dialogStack.splice(at, 1);
+    };
   }, [open, onClose, focusable]);
 
-  if (!mounted) return null;
+  if (!mounted || !portalRoot) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
       <div
         className={cn(
@@ -158,16 +199,19 @@ export function Modal({
           panelClassName ?? "max-w-3xl p-5 sm:p-7",
         )}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={closeLabel}
-          className="absolute right-2.5 top-2.5 rounded p-1.5 text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
+        {hideCloseButton ? null : (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={closeLabel}
+            className="absolute right-2.5 top-2.5 rounded p-1.5 text-ink-muted transition-colors hover:bg-canvas hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
         {children}
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }

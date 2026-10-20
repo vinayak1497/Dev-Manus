@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Lock, Mail, User, UserPlus } from "lucide-react";
 import { AnimatedForm } from "@/components/ui/auth";
 import { AuthShell, GoogleIcon } from "@/components/auth/AuthShell";
 import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
@@ -138,7 +139,7 @@ function RegisterForm() {
   if (isLoading) {
     return (
       <AuthShell orbitWord="Begin.">
-        <p role="status" className="text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           Checking your session…
         </p>
       </AuthShell>
@@ -148,7 +149,7 @@ function RegisterForm() {
   if (user) {
     return (
       <AuthShell orbitWord="Begin.">
-        <p role="status" className="text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           You&apos;re already signed in — taking you to your projects…
         </p>
       </AuthShell>
@@ -158,7 +159,7 @@ function RegisterForm() {
   if (!isConfigured) {
     return (
       <AuthShell orbitWord="Begin.">
-        <p role="status" className="max-w-sm text-sm text-ink-secondary">
+        <p role="status" className="auth-sub">
           {CONFIG_NOTICE}
         </p>
       </AuthShell>
@@ -169,6 +170,7 @@ function RegisterForm() {
     <AuthShell orbitWord="Begin.">
       {step === "credentials" ? (
         <AnimatedForm
+          icon={<UserPlus size={22} />}
           header="Create your account"
           subHeader="Start monitoring your first project in minutes."
           fields={[
@@ -177,6 +179,7 @@ function RegisterForm() {
               required: true,
               type: "text",
               placeholder: "Enter your full name",
+              icon: <User size={16} />,
               onChange: () => {},
             },
             {
@@ -184,6 +187,7 @@ function RegisterForm() {
               required: true,
               type: "email",
               placeholder: "Enter your email address",
+              icon: <Mail size={16} />,
               onChange: (event) => setEmail(event.target.value),
             },
             {
@@ -192,6 +196,7 @@ function RegisterForm() {
               type: "password",
               placeholder: "Create a password (min. 6 characters)",
               autoComplete: "new-password",
+              icon: <Lock size={16} />,
               onChange: () => {},
             },
             {
@@ -200,9 +205,11 @@ function RegisterForm() {
               type: "password",
               placeholder: "Confirm your password",
               autoComplete: "new-password",
+              icon: <Lock size={16} />,
               onChange: () => {},
             },
           ]}
+          providerSeparator="Or sign up with"
           submitButton={
             isSubmitting
               ? "Creating account…"
@@ -242,7 +249,15 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <AuthShell orbitWord="Begin.">
+          <p role="status" className="auth-sub">
+            Checking your session…
+          </p>
+        </AuthShell>
+      }
+    >
       <RegisterForm />
     </Suspense>
   );

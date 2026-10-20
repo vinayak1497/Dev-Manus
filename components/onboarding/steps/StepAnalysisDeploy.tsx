@@ -1,13 +1,24 @@
-import { Loader, RotateCcw } from "lucide-react";
+import { Box, CircleDot, Container, Layers, Loader, Package, RotateCcw, Ship, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import type { DeploymentStrategy, Evidence, HealthEndpointRole, PortFinding, PortRole, RepoAnalysis, SupportedDependencyService } from "@/lib/onboarding/types";
 import { applyDeploymentStrategy } from "@/lib/onboarding/configuration";
 import { deploymentOptionsFromAnalysis, deploymentStrategyLabel } from "@/lib/onboarding/deployment";
 import { evidencePaths } from "@/lib/onboarding/evidence";
 import { groupPortFindings } from "@/lib/onboarding/ports";
-import { Field, Hint, SectionCard } from "../StepFields";
+import { Field, Hint, OptionCard, SectionCard } from "../StepFields";
 import { DependencyBadge, ProvenanceBadge } from "../ProvenanceBadge";
 import type { StepProps } from "./StepBasicsRepo";
+
+/** Recognition aid only — the strategy name stays the source of truth. */
+const STRATEGY_ICON: Record<DeploymentStrategy, typeof Container> = {
+  dockerfile: Container,
+  compose: Layers,
+  kubernetes: Ship,
+  helm: Package,
+  framework: Box,
+  manual: Wrench,
+  none: CircleDot,
+};
 
 const PORT_ROLE_LABEL: Record<PortRole, string> = {
   application_http: "Application HTTP",
@@ -65,7 +76,7 @@ function PortFindings({ analysis }: { analysis: RepoAnalysis }) {
     : null;
   const otherCount = groups.infrastructure.length + groups.network.length + groups.other.length;
   return (
-    <div className="rounded border border-border-hairline bg-canvas px-2.5 py-2 sm:col-span-2">
+    <div className="border-t border-border-hairline pt-3 sm:col-span-2">
       <div className="flex items-start justify-between gap-2">
         <dt className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Ports</dt>
         <ProvenanceBadge provenance={selection.value !== null ? "detected" : analysis.applicationPort.ambiguous ? "unknown" : "not_detected"} />
@@ -126,7 +137,7 @@ function PortFindings({ analysis }: { analysis: RepoAnalysis }) {
 function HealthFindings({ analysis }: { analysis: RepoAnalysis }) {
   const endpoints = analysis.healthEndpoints.value ?? [];
   return (
-    <div className="rounded border border-border-hairline bg-canvas px-2.5 py-2 sm:col-span-2">
+    <div className="border-t border-border-hairline pt-3 sm:col-span-2">
       <div className="flex items-start justify-between gap-2">
         <dt className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Health endpoints by role</dt>
         <ProvenanceBadge provenance={endpoints.length > 0 ? "detected" : "not_detected"} />
@@ -152,7 +163,7 @@ function HealthFindings({ analysis }: { analysis: RepoAnalysis }) {
 function DependencyFindings({ analysis }: { analysis: RepoAnalysis }) {
   const services: SupportedDependencyService[] = ["postgres", "mysql", "mongodb", "redis"];
   return (
-    <div className="rounded border border-border-hairline bg-canvas px-3 py-2.5">
+    <div className="border-t border-border-hairline pt-3">
       <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Dependency assessment</p>
       <ul className="mt-1 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {services.map((service) => {
@@ -205,15 +216,10 @@ export function StepAnalysis({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Repository analysis
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          The wizard inspects the repository and later steps adapt to what it
-          finds. Findings are labelled — nothing is invented.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        The wizard inspects the repository and later steps adapt to what it
+        finds. Findings are labelled — nothing is invented.
+      </p>
 
       {status === "analyzing" ? (
         <div
@@ -427,17 +433,12 @@ export function StepDeployment({ state, setState, errors }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Deployment configuration
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          {headline}
-          {detected.length > 0
-            ? " Change it if the detected configuration is wrong."
-            : " You can also skip this and set it up later in Settings."}
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        {headline}
+        {detected.length > 0
+          ? " Change it if the detected configuration is wrong."
+          : " You can also skip this and set it up later in Settings."}
+      </p>
       {errors.strategy ? (
         <p role="alert" className="rounded-md border border-critical-border bg-critical-tint px-3 py-2 text-[13px] text-critical">
           {errors.strategy}
@@ -447,36 +448,20 @@ export function StepDeployment({ state, setState, errors }: StepProps) {
         {strategies.map((s) => {
           const isDetected = s.detected;
           const selected = d.strategy === s.id;
+          const StrategyIcon = STRATEGY_ICON[s.id];
           return (
-            <button
+            <OptionCard
               key={s.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setState((prev) => applyDeploymentStrategy(prev, s.id, prev.analysis))}
-              className={
-                selected
-                  ? "flex items-start justify-between gap-3 rounded-md border border-brand bg-brand-light/50 p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                  : "flex items-start justify-between gap-3 rounded-md border border-border-hairline bg-surface p-3 text-left hover:border-ink-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-              }
+              selected={selected}
+              label={`${s.title}. ${s.desc}`}
+              onSelect={() => setState((prev) => applyDeploymentStrategy(prev, s.id, prev.analysis))}
             >
-              <span className="flex items-start gap-3">
-                {/* Visible radio indicator so the group reads as a radio set
-                    at a glance, matching the pattern in Step 1. */}
-                <span
-                  aria-hidden="true"
-                  className={
-                    selected
-                      ? "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-brand"
-                      : "mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border"
-                  }
-                >
-                  {selected ? (
-                    <span className="h-2 w-2 rounded-full bg-brand" />
-                  ) : null}
-                </span>
-                <span>
-                  <span className="text-[14px] font-semibold text-ink">{s.title}</span>
+              <span className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                    <StrategyIcon className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                    {s.title}
+                  </span>
                   <span className="mt-0.5 block text-[13px] leading-5 text-ink-secondary">{s.desc}</span>
                   {isDetected && s.evidence.length > 0 ? (
                     <span className="mt-0.5 block truncate font-mono text-[11px] text-ink-muted" title={s.evidence.join(", ")}>
@@ -484,9 +469,9 @@ export function StepDeployment({ state, setState, errors }: StepProps) {
                     </span>
                   ) : null}
                 </span>
+                {isDetected ? <ProvenanceBadge provenance="detected" /> : null}
               </span>
-              {isDetected ? <ProvenanceBadge provenance="detected" /> : null}
-            </button>
+            </OptionCard>
           );
         })}
       </div>

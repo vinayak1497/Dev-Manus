@@ -21,7 +21,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ==================== Input ====================
-// Text field with a cursor-tracking glow ring. Light only.
+// Text field with a cursor-tracking glow ring. The ring colour comes from
+// `--auth-input-glow`, so the same component works on both skies.
 
 const Input = memo(
   forwardRef(function Input(
@@ -50,7 +51,7 @@ const Input = memo(
           background: useMotionTemplate`
         radial-gradient(
           ${visible ? radius + "px" : "0px"} circle at ${mouseX}px ${mouseY}px,
-          #155EEF,
+          var(--auth-input-glow),
           transparent 80%
         )
       `,
@@ -58,14 +59,11 @@ const Input = memo(
         onMouseMove={handleMouseMove}
         onMouseEnter={() => setVisible(true)}
         onMouseLeave={() => setVisible(false)}
-        className="group/input rounded-lg p-[2px] transition duration-300"
+        className="auth-input-shell"
       >
         <input
           type={type}
-          className={cn(
-            "flex h-10 w-full rounded-md border-none bg-surface px-3 py-2 text-sm text-ink shadow-input transition duration-300 placeholder:text-ink-muted focus-visible:outline-none focus-visible:ring-[2px] focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50 group-hover/input:shadow-none",
-            className,
-          )}
+          className={cn("auth-input", className)}
           ref={ref}
           {...props}
         />
@@ -318,6 +316,8 @@ type Field = {
   required?: boolean;
   type: FieldType;
   placeholder?: string;
+  /** Optional leading glyph inside the field (decorative, hidden from AT). */
+  icon?: ReactNode;
   /**
    * Overrides the autocomplete token. Password fields default to
    * "current-password" (sign-in); a registration form must pass
@@ -343,6 +343,8 @@ const toFieldId = (label: string): string =>
 type AnimatedFormProps = {
   header: string;
   subHeader?: string;
+  /** Icon shown in the rounded tile above the heading. */
+  icon?: ReactNode;
   fields: Field[];
   submitButton: string;
   textVariantButton?: string;
@@ -352,6 +354,8 @@ type AnimatedFormProps = {
   isSubmitting?: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   providerLabel?: string;
+  /** Label between the submit button and the provider button. */
+  providerSeparator?: string;
   onProviderClick?: () => void;
   providerIcon?: ReactNode;
   goTo?: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -364,6 +368,7 @@ type Errors = {
 const AnimatedForm = memo(function AnimatedForm({
   header,
   subHeader,
+  icon,
   fields,
   submitButton,
   textVariantButton,
@@ -372,14 +377,18 @@ const AnimatedForm = memo(function AnimatedForm({
   isSubmitting = false,
   onSubmit,
   providerLabel,
+  providerSeparator = "Or sign in with",
   onProviderClick,
   providerIcon,
   goTo,
 }: AnimatedFormProps) {
-  const [visible, setVisible] = useState<boolean>(false);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>(
+    {},
+  );
   const [errors, setErrors] = useState<Errors>({});
 
-  const toggleVisibility = () => setVisible(!visible);
+  const toggleVisibility = (label: string) =>
+    setVisibleFields((current) => ({ ...current, [label]: !current[label] }));
 
   const validateForm = (event: FormEvent<HTMLFormElement>) => {
     const currentErrors: Errors = {};
@@ -414,164 +423,150 @@ const AnimatedForm = memo(function AnimatedForm({
   };
 
   return (
-    <section className="mx-auto flex w-96 max-w-full flex-col gap-4 max-md:w-full">
-      <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-        <h2 className="text-3xl font-bold text-ink">{header}</h2>
+    <section className="auth-form">
+      {icon && (
+        <div className="auth-icon-tile" aria-hidden="true">
+          {icon}
+        </div>
+      )}
+
+      <BoxReveal boxColor="var(--auth-reveal)" duration={0.3}>
+        <h2 className="auth-heading">{header}</h2>
       </BoxReveal>
 
       {subHeader && (
-        <BoxReveal boxColor="#E8F0FE" duration={0.3} className="pb-2">
-          <p className="max-w-sm text-sm text-ink-secondary">{subHeader}</p>
+        <BoxReveal boxColor="var(--auth-reveal)" duration={0.3}>
+          <p className="auth-sub">{subHeader}</p>
         </BoxReveal>
       )}
 
-      {providerLabel && (
-        <>
-          <BoxReveal
-            boxColor="#E8F0FE"
-            duration={0.3}
-            overflow="visible"
-            width="unset"
-          >
-            <button
-              className="g-button group/btn h-10 w-full rounded-md bg-transparent font-medium outline-hidden hover:cursor-pointer disabled:cursor-wait disabled:opacity-70"
-              type="button"
-              onClick={onProviderClick}
-              disabled={isSubmitting}
-            >
-              <span className="flex h-full w-full items-center justify-center gap-3 text-sm text-ink">
-                {providerIcon}
-                {providerLabel}
-              </span>
-            </button>
-          </BoxReveal>
-
-          <BoxReveal boxColor="#E8F0FE" duration={0.3} width="100%">
-            <section className="flex items-center gap-4">
-              <hr className="flex-1 border border-dashed border-border" />
-              <p className="text-sm text-ink-secondary">or</p>
-              <hr className="flex-1 border border-dashed border-border" />
-            </section>
-          </BoxReveal>
-        </>
-      )}
-
       {notice && (
-        <p
-          role="status"
-          className="rounded-md border border-info-border bg-info-tint px-3 py-2.5 text-[13px] leading-5 text-info"
-        >
+        <p role="status" className="auth-notice">
           {notice}
         </p>
       )}
 
       <form onSubmit={handleSubmit} noValidate={false}>
-        <section className="mb-4 grid grid-cols-1">
-          {fields.map((field) => (
-            <section key={field.label} className="flex flex-col gap-2">
-              <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-                <Label htmlFor={toFieldId(field.label)}>
-                  {field.label}{" "}
+        <div className="auth-fields">
+          {fields.map((field) => {
+            const fieldId = toFieldId(field.label);
+            const fieldError = errors[field.label];
+            const isPassword = field.type === "password";
+            const isVisible = Boolean(visibleFields[field.label]);
+
+            return (
+              <div key={field.label} className="auth-field">
+                <Label htmlFor={fieldId} className="auth-label">
+                  {field.label}
                   {field.required && (
-                    <span className="text-critical" aria-hidden="true">
-                      *
+                    <span className="auth-required" aria-hidden="true">
+                      {" *"}
                     </span>
                   )}
                 </Label>
-              </BoxReveal>
 
-              <BoxReveal
-                width="100%"
-                boxColor="#E8F0FE"
-                duration={0.3}
-                className="flex w-full flex-col space-y-2"
-              >
-                <section className="relative">
+                <div className="auth-field__control">
+                  {field.icon && (
+                    <span className="auth-field__icon" aria-hidden="true">
+                      {field.icon}
+                    </span>
+                  )}
                   <Input
                     type={
-                      field.type === "password"
-                        ? visible
-                          ? "text"
-                          : "password"
-                        : field.type
+                      isPassword ? (isVisible ? "text" : "password") : field.type
                     }
-                    id={toFieldId(field.label)}
+                    id={fieldId}
                     name={field.label}
                     placeholder={field.placeholder}
                     onChange={field.onChange}
                     autoComplete={
                       field.autoComplete ??
-                      (field.type === "password"
-                        ? "current-password"
-                        : field.type)
+                      (isPassword ? "current-password" : field.type)
                     }
+                    aria-invalid={fieldError ? true : undefined}
+                    aria-describedby={
+                      fieldError ? `${fieldId}-error` : undefined
+                    }
+                    className={cn(
+                      field.icon && "auth-input--icon",
+                      isPassword && "auth-input--password",
+                    )}
                   />
 
-                  {field.type === "password" && (
+                  {isPassword && (
                     <button
                       type="button"
-                      onClick={toggleVisibility}
-                      aria-label={visible ? "Hide password" : "Show password"}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm leading-5 text-ink-secondary hover:text-ink"
+                      onClick={() => toggleVisibility(field.label)}
+                      aria-label={isVisible ? "Hide password" : "Show password"}
+                      className="auth-field__toggle"
                     >
-                      {visible ? (
-                        <EyeOff className="h-5 w-5" />
+                      {isVisible ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
                       ) : (
-                        <Eye className="h-5 w-5" />
+                        <Eye className="h-4 w-4" aria-hidden="true" />
                       )}
                     </button>
                   )}
-                </section>
+                </div>
 
-                <section className="h-4">
-                  {errors[field.label] && (
-                    <p className="text-xs text-critical" role="alert">
-                      {errors[field.label]}
+                <div className="auth-field__error">
+                  {fieldError && (
+                    <p id={`${fieldId}-error`} role="alert">
+                      {fieldError}
                     </p>
                   )}
-                </section>
-              </BoxReveal>
-            </section>
-          ))}
-        </section>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-        <BoxReveal width="100%" boxColor="#E8F0FE" duration={0.3}>
-          {errorField && (
-            <p className="mb-4 text-sm text-critical" role="alert">
-              {errorField}
-            </p>
-          )}
-        </BoxReveal>
-
-        <BoxReveal
-          width="100%"
-          boxColor="#E8F0FE"
-          duration={0.3}
-          overflow="visible"
-        >
-          <button
-            className="block h-10 w-full rounded-md bg-brand font-medium text-white shadow-md transition-all outline-hidden hover:cursor-pointer hover:bg-brand-hover hover:shadow-lg active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
-            type="submit"
-            disabled={isSubmitting}
-            aria-busy={isSubmitting}
-          >
-            {submitButton} &rarr;
-          </button>
-        </BoxReveal>
-
-        {textVariantButton && goTo && (
-          <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-            <section className="mt-4 text-center hover:cursor-pointer">
-              <button
-                className="text-sm text-brand outline-hidden hover:cursor-pointer hover:underline"
-                onClick={goTo}
-              >
-                {textVariantButton}
-              </button>
-            </section>
-          </BoxReveal>
+        {errorField && (
+          <p className="auth-error" role="alert">
+            {errorField}
+          </p>
         )}
+
+        <button
+          className="auth-submit"
+          type="submit"
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+        >
+          {submitButton}
+        </button>
       </form>
+
+      {providerLabel && (
+        <>
+          <div className="auth-divider">
+            <span className="auth-divider__rule" />
+            <span className="auth-divider__text">{providerSeparator}</span>
+            <span className="auth-divider__rule" />
+          </div>
+          <button
+            className="auth-provider"
+            type="button"
+            onClick={onProviderClick}
+            disabled={isSubmitting}
+          >
+            {providerIcon}
+            <span>{providerLabel}</span>
+          </button>
+        </>
+      )}
+
+      {textVariantButton && goTo && (
+        <div className="auth-switch">
+          <button
+            type="button"
+            className="auth-switch__btn"
+            onClick={goTo}
+          >
+            {textVariantButton}
+          </button>
+        </div>
+      )}
     </section>
   );
 });
