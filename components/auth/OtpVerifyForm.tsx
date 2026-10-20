@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { KeyRound, MailCheck } from "lucide-react";
-import { BoxReveal, Input, Label } from "@/components/ui/auth";
+import { MailCheck } from "lucide-react";
+import { BoxReveal } from "@/components/ui/auth";
+import { OtpInput } from "@/components/ui/otp-input";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -93,43 +94,26 @@ export function OtpVerifyForm({
       <form onSubmit={handleSubmit} noValidate={false}>
         <div className="auth-fields">
           <div className="auth-field">
-            <Label htmlFor="otp-code" className="auth-label">
+            <span className="auth-label">
               Verification code
               <span className="auth-required" aria-hidden="true">
                 {" *"}
               </span>
-            </Label>
+            </span>
 
-            <div className="auth-field__control">
-              <span className="auth-field__icon" aria-hidden="true">
-                <KeyRound size={16} />
-              </span>
-              <Input
-                id="otp-code"
-                name="otp-code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="Enter 6-digit code"
-                maxLength={6}
-                value={code}
-                disabled={busy}
-                aria-invalid={fieldError ? true : undefined}
-                aria-describedby={fieldError ? "otp-code-error" : undefined}
-                className="auth-input--icon"
-                onChange={(event) =>
-                  setCode(event.target.value.replace(/[^0-9]/g, ""))
-                }
-              />
-            </div>
-
-            <div className="auth-field__error">
-              {fieldError && (
-                <p id="otp-code-error" role="alert">
-                  {fieldError}
-                </p>
-              )}
-            </div>
+            <OtpInput
+              label="Verification code"
+              length={6}
+              status={fieldError ? "error" : "idle"}
+              errorMessage={fieldError ?? ""}
+              hint="Enter the 6-digit code we emailed you."
+              disabled={busy}
+              autoFocus
+              onChange={(value) => {
+                setCode(value);
+                setCodeError(null);
+              }}
+            />
           </div>
         </div>
 

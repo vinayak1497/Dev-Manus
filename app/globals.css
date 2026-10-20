@@ -128,6 +128,15 @@ button:focus-visible,
   --auth-focus-halo: rgba(21, 94, 239, 0.22);
   --auth-error: #b42318;
 
+  /* OTP cells */
+  --auth-otp-bg: rgba(241, 245, 249, 0.8);
+  --auth-otp-border: #e2e8f0;
+  --auth-otp-border-strong: #cbd5e1;
+  --auth-otp-accent: #155eef;
+  --auth-otp-ring: rgba(21, 94, 239, 0.14);
+  --auth-otp-inset: inset 0 1px 2px rgba(28, 25, 23, 0.06);
+  --auth-otp-success: #047857;
+
   --auth-card-bg: rgba(255, 255, 255, 0.84);
   --auth-card-bg-solid: rgba(250, 253, 255, 0.97);
   --auth-card-border: rgba(255, 255, 255, 0.85);
@@ -176,6 +185,15 @@ button:focus-visible,
   --auth-focus: #9cc4ff;
   --auth-focus-halo: rgba(156, 196, 255, 0.3);
   --auth-error: #ff9c95;
+
+  /* OTP cells */
+  --auth-otp-bg: rgba(6, 18, 33, 0.55);
+  --auth-otp-border: rgba(255, 255, 255, 0.1);
+  --auth-otp-border-strong: rgba(255, 255, 255, 0.24);
+  --auth-otp-accent: #93b0ff;
+  --auth-otp-ring: rgba(147, 176, 255, 0.22);
+  --auth-otp-inset: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  --auth-otp-success: #34d399;
 
   --auth-card-bg: rgba(9, 24, 43, 0.68);
   --auth-card-bg-solid: rgba(9, 24, 43, 0.96);
@@ -675,6 +693,84 @@ button:focus-visible,
   font-size: 12px;
   line-height: 1.5;
   text-align: center;
+}
+
+/* ------------------------------ OTP cells -------------------------------- */
+
+.auth-otp__slot,
+.auth-otp__cell {
+  width: 40px;
+  height: 48px;
+}
+
+.auth-otp__cell {
+  background: var(--auth-otp-bg);
+  border-color: var(--auth-otp-border);
+  box-shadow: var(--auth-otp-inset);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.auth-otp__cell--filled {
+  background: var(--auth-input-bg);
+  border-color: var(--auth-otp-border-strong);
+  box-shadow: none;
+}
+
+.auth-otp__cell--active {
+  background: var(--auth-input-bg);
+  border-color: var(--auth-otp-accent);
+  box-shadow: 0 0 0 3px var(--auth-otp-ring);
+}
+
+.auth-otp__cell--error {
+  border-color: var(--auth-error);
+}
+
+.auth-otp__cell--success {
+  border-color: var(--auth-otp-success);
+}
+
+.auth-otp__digit {
+  color: var(--auth-text);
+}
+
+.auth-otp__caret {
+  background: var(--auth-text);
+}
+
+.auth-otp__message {
+  color: var(--auth-text-secondary);
+}
+
+.auth-otp__message--error {
+  color: var(--auth-error);
+}
+
+.auth-otp__message--success {
+  color: var(--auth-otp-success);
+}
+
+@media (max-width: 380px) {
+  .auth-otp__group {
+    gap: 6px;
+  }
+
+  .auth-otp__group > .auth-otp__slot {
+    margin-left: 0;
+  }
+
+  .auth-otp__group > .auth-otp__slot:nth-child(4) {
+    margin-left: 10px;
+  }
+
+  .auth-otp__slot,
+  .auth-otp__cell {
+    width: 36px;
+    height: 44px;
+  }
 }
 
 /* ----------------------------- Theme toggle ------------------------------ */
