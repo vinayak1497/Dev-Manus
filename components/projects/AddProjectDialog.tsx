@@ -46,12 +46,18 @@ export function AddProjectDialog({
         {triggerLabel}
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} label="Add a project">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        label="Add a project"
+        hideCloseButton
+        panelClassName="flex w-[min(100%-2rem,64rem)] flex-col overflow-hidden p-0"
+      >
         <AddProjectWizard
           onExit={() => setOpen(false)}
           onComplete={() => router.refresh()}
         />
-        <p className="mt-4 text-center text-[12px] text-ink-muted">
+        <p className="shrink-0 border-t border-border-hairline px-5 py-2.5 text-center text-[12px] text-ink-muted">
           Prefer a full page?{" "}
           <a
             href="/projects/new"

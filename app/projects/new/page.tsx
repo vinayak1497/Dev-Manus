@@ -46,10 +46,11 @@ export default function NewProjectPage() {
 
       <main
         id="main-content"
-        className="mx-auto w-full max-w-3xl px-4 pb-16 pt-8 lg:px-8"
+        className="mx-auto w-full px-4 pb-16 pt-8 lg:px-8"
       >
-        <div className="rounded-lg border border-border-hairline bg-surface p-5 shadow-card sm:p-7">
-          <AddProjectWizard embedded />
+        {/* Same shell width as the dialog so both entries share one layout. */}
+        <div className="mx-auto w-[min(100%,64rem)]">
+          <AddProjectWizard embedded exitHref="/projects" />
         </div>
         <p className="mt-4 text-center text-[12px] text-ink-muted">
           Your progress is saved in this browser while the wizard is open.

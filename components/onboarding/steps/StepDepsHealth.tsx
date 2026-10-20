@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { DependencyStatus } from "@/lib/onboarding/types";
-import { Field, Hint, SectionCard, inputClass } from "../StepFields";
+import { Field, FieldGroup, Hint, OptionCard, OptionCardText, inputClass } from "../StepFields";
 import { DependencyBadge, ProvenanceBadge } from "../ProvenanceBadge";
 import { buildHealthCheckUrl, HEALTH_TARGET_TYPE_LABEL } from "@/lib/onboarding/health";
 import type { HealthTargetType } from "@/lib/onboarding/types";
@@ -21,16 +21,11 @@ export function StepDependencies({ state, setState }: StepProps) {
   const findings = state.analysis?.status === "ready" ? state.analysis.dependencyFindings : null;
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Dependencies &amp; database
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          Confirm what the application depends on. Detection comes from
-          manifests and compose files — a package name alone never proves a
-          live dependency.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        Confirm what the application depends on. Detection comes from
+        manifests and compose files — a package name alone never proves a
+        live dependency.
+      </p>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {DBS.map((db) => {
@@ -60,21 +55,21 @@ export function StepDependencies({ state, setState }: StepProps) {
         })}
       </div>
 
-      <SectionCard title="External APIs" description="Third-party services the app calls (optional).">
+      <FieldGroup title="External APIs" description="Third-party services the app calls (optional).">
         <ApiList
           values={d.externalApis}
           placeholder="api.stripe.com"
           onChange={(v) => setState((s) => ({ ...s, dependencies: { ...s.dependencies, externalApis: v } }))}
         />
-      </SectionCard>
+      </FieldGroup>
 
-      <SectionCard title="Queues & caches" description="Message systems beyond Redis (optional).">
+      <FieldGroup title="Queues & caches" description="Message systems beyond Redis (optional).">
         <ApiList
           values={d.queues}
           placeholder="NATS subject, SQS queue…"
           onChange={(v) => setState((s) => ({ ...s, dependencies: { ...s.dependencies, queues: v } }))}
         />
-      </SectionCard>
+      </FieldGroup>
 
       <Field label="Notes" htmlFor="ob-depnotes2" hint="Optional">
         <input
@@ -156,15 +151,10 @@ export function StepHealth({ state, setState, errors }: StepProps) {
   const check = buildHealthCheckUrl(h.targetUrl, h.endpoint);
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Health monitoring
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          How the platform will know the application is alive. Pick what
-          actually exists — port checks are honest when there is no endpoint.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        How the platform will know the application is alive. Pick what
+        actually exists — port checks are honest when there is no endpoint.
+      </p>
 
       <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Check method">
         {(
@@ -176,21 +166,14 @@ export function StepHealth({ state, setState, errors }: StepProps) {
         ).map((m) => {
           const selected = h.method === m.id;
           return (
-            <button
+            <OptionCard
               key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setState((s) => ({ ...s, health: { ...s.health, method: m.id, methodProvenance: "configured" } }))}
-              className={
-                selected
-                  ? "rounded-md border border-brand bg-brand-light/60 p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-                  : "rounded-md border border-border-hairline bg-surface p-3 text-left hover:border-ink-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-              }
+              selected={selected}
+              label={`${m.t}. ${m.d}`}
+              onSelect={() => setState((s) => ({ ...s, health: { ...s.health, method: m.id, methodProvenance: "configured" } }))}
             >
-              <span className="block text-[13px] font-semibold text-ink">{m.t}</span>
-              <span className="mt-0.5 block text-[12px] leading-4 text-ink-secondary">{m.d}</span>
-            </button>
+              <OptionCardText title={m.t} description={m.d} />
+            </OptionCard>
           );
         })}
       </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Plus, Terminal, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Field, Hint, SectionCard, inputClass } from "../StepFields";
+import { Field, FieldGroup, Hint, inputClass } from "../StepFields";
 import { EnvVarImport } from "../EnvVarImport";
 import { ProvenanceBadge } from "../ProvenanceBadge";
 import { applyImportedValue } from "@/lib/onboarding/dotenv";
@@ -41,20 +41,16 @@ export function StepEnvironment({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Environment &amp; secrets
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          Plain configuration above the line, credentials below it. Secret values
-          stay in this session — only <strong className="font-medium text-ink">names</strong> are
-          saved with the project.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        Plain configuration above the line, credentials below it. Secret values
+        stay in this session — only <strong className="font-medium text-ink">names</strong> are
+        saved with the project.
+      </p>
 
-      <SectionCard
+      <FieldGroup
         title="Environment variables"
         description="Non-sensitive configuration such as ports, hosts, and feature flags."
+        icon={<Terminal className="h-4 w-4" aria-hidden="true" />}
       >
         {errors.vars ? (
           <p role="alert" className="rounded-md border border-critical-border bg-critical-tint px-3 py-2 text-[13px] text-critical">
@@ -172,11 +168,12 @@ export function StepEnvironment({
           Anything sensitive belongs in Secrets below, where values stay in this
           session.
         </Hint>
-      </SectionCard>
+      </FieldGroup>
 
-      <SectionCard
+      <FieldGroup
         title="Secrets"
         description="API keys, passwords, tokens. Masked by default, never stored in git, never logged."
+        icon={<KeyRound className="h-4 w-4" aria-hidden="true" />}
       >
         {errors.secrets ? (
           <p role="alert" className="rounded-md border border-critical-border bg-critical-tint px-3 py-2 text-[13px] text-critical">
@@ -261,7 +258,7 @@ export function StepEnvironment({
           ) : null}
         </div>
         <Hint>Only names + “value provided?” are saved. Values never leave this tab.</Hint>
-      </SectionCard>
+      </FieldGroup>
     </div>
   );
 }
@@ -273,15 +270,10 @@ export function StepRuntime({ state, setState, errors }: StepProps) {
   const alternatives = state.analysis?.applicationPort.alternatives ?? [];
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Runtime configuration
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          How the application builds and runs. Auto-detected rows are marked —
-          override anything that looks wrong.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        How the application builds and runs. Auto-detected rows are marked —
+        override anything that looks wrong.
+      </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Development command" htmlFor="ob-dev" hint="Optional">

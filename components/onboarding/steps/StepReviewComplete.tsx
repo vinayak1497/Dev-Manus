@@ -1,4 +1,4 @@
-import { Check, Loader, Pencil } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import type { Provenance, WizardState, WizardStepId } from "@/lib/onboarding/types";
 import { WIZARD_STEP_META } from "@/lib/onboarding/types";
@@ -11,14 +11,10 @@ export function StepReview({
   state,
   onEdit,
   submitError,
-  isSubmitting,
-  onSubmit,
 }: {
   state: WizardState;
   onEdit: (step: WizardStepId) => void;
   submitError: string | null;
-  isSubmitting: boolean;
-  onSubmit: () => void;
 }) {
   const a = state.analysis;
   const canonical = buildCanonicalConfiguration(state);
@@ -30,15 +26,10 @@ export function StepReview({
         : "—";
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-          Review &amp; connect
-        </h2>
-        <p className="mt-1 text-[14px] leading-6 text-ink-secondary">
-          Check everything once. Nothing is created until you press{" "}
-          <strong className="font-medium text-ink">Start Monitoring</strong>.
-        </p>
-      </div>
+      <p className="text-[14px] leading-6 text-ink-secondary">
+        Check everything once. Nothing is created until you press{" "}
+        <strong className="font-medium text-ink">Start Monitoring</strong>.
+      </p>
 
       {submitError ? (
         <p role="alert" className="rounded-md border border-critical-border bg-critical-tint px-3 py-2 text-[13px] text-critical">
@@ -150,21 +141,6 @@ export function StepReview({
         />
       </ReviewGroup>
 
-      <button
-        type="button"
-        onClick={onSubmit}
-        disabled={isSubmitting}
-        className="inline-flex h-11 items-center justify-center gap-2 rounded bg-brand px-5 text-[15px] font-semibold text-white shadow-md transition-all hover:bg-brand-hover disabled:cursor-wait disabled:opacity-70"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Creating project…
-          </>
-        ) : (
-          "Start Monitoring"
-        )}
-      </button>
       <p className="text-[12px] text-ink-muted">
         Creates one project and saves this configuration. You can edit everything later in Settings.
       </p>

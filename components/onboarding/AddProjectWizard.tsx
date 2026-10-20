@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Loader, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader } from "lucide-react";
 import { createProjectFromOnboarding } from "@/app/projects/actions";
 import {
   WIZARD_STEPS,
@@ -31,7 +31,7 @@ import {
   saveSecretValues,
 } from "@/lib/onboarding/storage";
 import { validateStep } from "@/lib/onboarding/validation";
-import { WizardStepper } from "./WizardStepper";
+import { WizardShell } from "./WizardShell";
 import { StepBasics, StepRepository } from "./steps/StepBasicsRepo";
 import { StepAnalysis, StepDeployment } from "./steps/StepAnalysisDeploy";
 import { StepEnvironment, StepRuntime } from "./steps/StepEnvRuntime";
@@ -46,6 +46,8 @@ type Props = {
   onExit?: () => void;
   /** Full-page mode hides the modal close button. */
   embedded?: boolean;
+  /** Full-page close target (the dialog uses onExit instead). */
+  exitHref?: string;
 };
 
 function stepIndex(id: WizardStepId): number {
@@ -62,7 +64,7 @@ function stepIndex(id: WizardStepId): number {
  *   idempotent on draftId); nothing is created during navigation.
  * - Draft survives refresh via localStorage (secret VALUES excluded).
  */
-export function AddProjectWizard({ initial, onComplete, onExit, embedded }: Props) {
+export function AddProjectWizard({ initial, onComplete, onExit, embedded, exitHref }: Props) {
   const router = useRouter();
   const [state, setState] = useState<WizardState>(
     () => initial ?? loadDraft() ?? emptyWizardState(),
@@ -267,125 +269,131 @@ export function AddProjectWizard({ initial, onComplete, onExit, embedded }: Prop
 
   const showNav = current !== "complete" && current !== "review";
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
-        <div ref={headingRef} tabIndex={-1} className="focus:outline-none">
-          <p className="font-mono text-[12px] uppercase tracking-wide text-ink-muted">
-            Add project · Step {idx + 1} of {WIZARD_STEPS.length}
-          </p>
-          <h2 className="mt-0.5 text-[18px] font-semibold text-ink">
-            {WIZARD_STEP_META[current].title}
-          </h2>
-        </div>
-        {!embedded && onExit ? (
-          <button
-            type="button"
-            onClick={onExit}
-            aria-label="Close onboarding"
-            className="rounded p-1.5 text-ink-muted hover:bg-canvas hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
+  const backButton = (
+    <button
+      type="button"
+      onClick={back}
+      disabled={idx === 0}
+      className={cn(
+        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded border border-border-hairline bg-surface px-4 text-[14px] font-medium text-ink transition-colors hover:bg-canvas disabled:opacity-40",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+      )}
+    >
+      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      Back
+    </button>
+  );
 
-      <WizardStepper current={current} completed={completed} onGo={goTo} />
+  const continueButton = (
+    <button
+      type="button"
+      onClick={next}
+      className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded bg-brand px-5 text-[14px] font-semibold text-white shadow-md transition-all hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+    >
+      Continue
+      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
 
-      <div aria-live="polite">
-        {current === "basics" ? (
-          <StepBasics state={state} setState={setState} errors={errors} />
-        ) : current === "repository" ? (
-          <StepRepository state={state} setState={setState} errors={errors} />
-        ) : current === "analysis" ? (
-          <StepAnalysis state={state} setState={setState} errors={errors} onAnalyze={runAnalysis} />
-        ) : current === "deployment" ? (
-          <StepDeployment state={state} setState={setState} errors={errors} />
-        ) : current === "environment" ? (
-          <StepEnvironment
-            state={state}
-            setState={setState}
-            errors={errors}
-            secretValues={secretValues}
-            setSecretValue={setSecretValue}
-          />
-        ) : current === "runtime" ? (
-          <StepRuntime state={state} setState={setState} errors={errors} />
-        ) : current === "dependencies" ? (
-          <StepDependencies state={state} setState={setState} errors={errors} />
-        ) : current === "health" ? (
-          <StepHealth state={state} setState={setState} errors={errors} />
-        ) : current === "review" ? (
-          <StepReview
-            state={state}
-            onEdit={goTo}
-            submitError={submitError}
-            isSubmitting={isSubmitting}
-            onSubmit={submit}
-          />
-        ) : state.createdProjectId ? (
-          <StepComplete state={state} projectId={state.createdProjectId} />
-        ) : null}
-      </div>
-
-      {showNav ? (
-        <div className="flex items-center justify-between gap-2 border-t border-border-hairline pt-4">
-          <button
-            type="button"
-            onClick={back}
-            disabled={idx === 0}
-            className={cn(
-              "inline-flex h-10 items-center gap-1.5 rounded border border-border-hairline bg-surface px-4 text-[14px] font-medium text-ink transition-colors hover:bg-canvas disabled:opacity-40",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-            )}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Back
-          </button>
-          <div className="flex items-center gap-2">
-            {current === "repository" && !state.repository.url.trim() ? (
-              <span className="hidden text-[12px] text-ink-muted sm:inline">
-                No URL needed — Continue works.
-              </span>
-            ) : null}
-            {current === "environment" ? (
-              <button
-                type="button"
-                onClick={next}
-                className="inline-flex h-10 items-center rounded px-3 text-[14px] font-medium text-ink-secondary hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-              >
-                Skip for now
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={next}
-              className="inline-flex h-10 items-center gap-1.5 rounded bg-brand px-5 text-[14px] font-semibold text-white shadow-md transition-all hover:bg-brand-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              Continue
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      ) : current === "review" ? (
-        <div className="flex items-center justify-start gap-2 border-t border-border-hairline pt-4">
-          <button
-            type="button"
-            onClick={back}
-            className="inline-flex h-10 items-center gap-1.5 rounded border border-border-hairline bg-surface px-4 text-[14px] font-medium text-ink hover:bg-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Back
-          </button>
-        </div>
-      ) : null}
-
+  // The review step's primary action lives in the footer like every other
+  // step — same handler, same states, same labels as the button that used to
+  // sit inside the scrollable summary.
+  const startMonitoringButton = (
+    <button
+      type="button"
+      onClick={submit}
+      disabled={isSubmitting}
+      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded bg-brand px-5 text-[14px] font-semibold text-white shadow-md transition-all hover:bg-brand-hover disabled:cursor-wait disabled:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+    >
       {isSubmitting ? (
-        <p className="inline-flex items-center gap-2 text-[13px] text-ink-secondary" role="status">
+        <>
           <Loader className="h-4 w-4 animate-spin" aria-hidden="true" />
-          Saving configuration…
-        </p>
-      ) : null}
+          Creating project…
+        </>
+      ) : (
+        "Start Monitoring"
+      )}
+    </button>
+  );
+
+  const footer = showNav ? (
+    <div className="flex items-center justify-between gap-2">
+      {backButton}
+      <div className="flex min-w-0 items-center gap-2">
+        {current === "repository" && !state.repository.url.trim() ? (
+          <span className="hidden truncate text-[12px] text-ink-muted sm:inline">
+            No URL needed — Continue works.
+          </span>
+        ) : null}
+        {current === "environment" ? (
+          <button
+            type="button"
+            onClick={next}
+            className="shrink-0 rounded px-3 py-2 text-[14px] font-medium text-ink-secondary hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            Skip for now
+          </button>
+        ) : null}
+        {continueButton}
+      </div>
     </div>
+  ) : current === "review" ? (
+    <div className="flex items-center justify-between gap-2">
+      {backButton}
+      {startMonitoringButton}
+    </div>
+  ) : null;
+
+  const statusLine = isSubmitting ? (
+    <p className="mt-2 inline-flex items-center gap-2 text-[13px] text-ink-secondary" role="status">
+      <Loader className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Saving configuration…
+    </p>
+  ) : null;
+
+  return (
+    <WizardShell
+      mode={embedded ? "page" : "dialog"}
+      current={current}
+      completed={completed}
+      onGo={goTo}
+      headingRef={headingRef}
+      onExit={!embedded ? onExit : undefined}
+      exitHref={embedded ? exitHref : undefined}
+      footer={footer}
+      statusLine={statusLine}
+    >
+      {current === "basics" ? (
+        <StepBasics state={state} setState={setState} errors={errors} />
+      ) : current === "repository" ? (
+        <StepRepository state={state} setState={setState} errors={errors} />
+      ) : current === "analysis" ? (
+        <StepAnalysis state={state} setState={setState} errors={errors} onAnalyze={runAnalysis} />
+      ) : current === "deployment" ? (
+        <StepDeployment state={state} setState={setState} errors={errors} />
+      ) : current === "environment" ? (
+        <StepEnvironment
+          state={state}
+          setState={setState}
+          errors={errors}
+          secretValues={secretValues}
+          setSecretValue={setSecretValue}
+        />
+      ) : current === "runtime" ? (
+        <StepRuntime state={state} setState={setState} errors={errors} />
+      ) : current === "dependencies" ? (
+        <StepDependencies state={state} setState={setState} errors={errors} />
+      ) : current === "health" ? (
+        <StepHealth state={state} setState={setState} errors={errors} />
+      ) : current === "review" ? (
+        <StepReview
+          state={state}
+          onEdit={goTo}
+          submitError={submitError}
+        />
+      ) : state.createdProjectId ? (
+        <StepComplete state={state} projectId={state.createdProjectId} />
+      ) : null}
+    </WizardShell>
   );
 }
