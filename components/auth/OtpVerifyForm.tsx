@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { KeyRound, MailCheck } from "lucide-react";
 import { BoxReveal, Input, Label } from "@/components/ui/auth";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
 /**
- * OTP verification step. Reuses the auth design language (BoxReveal
- * headers, cursor-glow Input, brand submit, ghost resend, text links) —
- * no new visual system.
+ * OTP verification step. Uses the same card language as `AnimatedForm` —
+ * icon tile, heading, supporting text, one field, one primary action — so the
+ * step never looks like a different product.
  */
 export function OtpVerifyForm({
   email,
@@ -63,47 +64,46 @@ export function OtpVerifyForm({
     if (sent) setCooldown(RESEND_COOLDOWN_SECONDS);
   };
 
+  const fieldError = codeError ?? error;
+
   return (
-    <section className="mx-auto flex w-96 max-w-full flex-col gap-4 max-md:w-full">
-      <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-        <h2 className="text-3xl font-bold text-ink">Check your email</h2>
+    <section className="auth-form">
+      <div className="auth-icon-tile" aria-hidden="true">
+        <MailCheck size={22} />
+      </div>
+
+      <BoxReveal boxColor="var(--auth-reveal)" duration={0.3}>
+        <h2 className="auth-heading">Check your email</h2>
       </BoxReveal>
 
-      <BoxReveal boxColor="#E8F0FE" duration={0.3} className="pb-2">
-        <p className="max-w-sm text-sm text-ink-secondary">
+      <BoxReveal boxColor="var(--auth-reveal)" duration={0.3}>
+        <p className="auth-sub">
           We sent a 6-digit code to{" "}
-          <span className="font-medium text-ink">{email}</span>. Enter it below
-          to continue — or just click the sign-in link in the same email.
+          <span className="auth-emphasis">{email}</span>. Enter it below to
+          continue — or just click the sign-in link in the same email.
         </p>
       </BoxReveal>
 
       {notice && (
-        <p
-          role="status"
-          className="rounded-md border border-info-border bg-info-tint px-3 py-2.5 text-[13px] leading-5 text-info"
-        >
+        <p role="status" className="auth-notice">
           {notice}
         </p>
       )}
 
       <form onSubmit={handleSubmit} noValidate={false}>
-        <section className="mb-4 grid grid-cols-1">
-          <section className="flex flex-col gap-2">
-            <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-              <Label htmlFor="otp-code">
-                Verification code{" "}
-                <span className="text-critical" aria-hidden="true">
-                  *
-                </span>
-              </Label>
-            </BoxReveal>
+        <div className="auth-fields">
+          <div className="auth-field">
+            <Label htmlFor="otp-code" className="auth-label">
+              Verification code
+              <span className="auth-required" aria-hidden="true">
+                {" *"}
+              </span>
+            </Label>
 
-            <BoxReveal
-              width="100%"
-              boxColor="#E8F0FE"
-              duration={0.3}
-              className="flex w-full flex-col space-y-2"
-            >
+            <div className="auth-field__control">
+              <span className="auth-field__icon" aria-hidden="true">
+                <KeyRound size={16} />
+              </span>
               <Input
                 id="otp-code"
                 name="otp-code"
@@ -114,74 +114,62 @@ export function OtpVerifyForm({
                 maxLength={6}
                 value={code}
                 disabled={busy}
+                aria-invalid={fieldError ? true : undefined}
+                aria-describedby={fieldError ? "otp-code-error" : undefined}
+                className="auth-input--icon"
                 onChange={(event) =>
                   setCode(event.target.value.replace(/[^0-9]/g, ""))
                 }
               />
-              <section className="h-4">
-                {(codeError || error) && (
-                  <p className="text-xs text-critical" role="alert">
-                    {codeError ?? error}
-                  </p>
-                )}
-              </section>
-            </BoxReveal>
-          </section>
-        </section>
+            </div>
 
-        <BoxReveal
-          width="100%"
-          boxColor="#E8F0FE"
-          duration={0.3}
-          overflow="visible"
+            <div className="auth-field__error">
+              {fieldError && (
+                <p id="otp-code-error" role="alert">
+                  {fieldError}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <button
+          className="auth-submit"
+          type="submit"
+          disabled={busy}
+          aria-busy={busy}
         >
-          <button
-            className="block h-10 w-full rounded-md bg-brand font-medium text-white shadow-md transition-all outline-hidden hover:cursor-pointer hover:bg-brand-hover hover:shadow-lg active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
-            type="submit"
-            disabled={busy}
-            aria-busy={busy}
-          >
-            {isVerifying ? "Verifying…" : "Verify code →"}
-          </button>
-        </BoxReveal>
-
-        <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-          <section className="mt-4 text-center">
-            <button
-              className="text-sm text-brand outline-hidden hover:cursor-pointer hover:underline disabled:cursor-wait disabled:opacity-60 disabled:hover:no-underline"
-              type="button"
-              onClick={handleResend}
-              disabled={cooldown > 0 || busy}
-            >
-              {isResending
-                ? "Sending…"
-                : cooldown > 0
-                  ? `Resend code in ${cooldown}s`
-                  : "Resend code"}
-            </button>
-          </section>
-        </BoxReveal>
-
-        <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-          <section className="mt-2 text-center">
-            <button
-              className="text-sm text-ink-secondary outline-hidden hover:cursor-pointer hover:text-ink hover:underline disabled:opacity-60"
-              type="button"
-              onClick={onBack}
-              disabled={busy}
-            >
-              Use a different email
-            </button>
-          </section>
-        </BoxReveal>
-
-        <BoxReveal boxColor="#E8F0FE" duration={0.3}>
-          <p className="mt-6 text-center text-[12px] leading-5 text-ink-secondary">
-            No code yet? Check your spam folder, or wait a minute before
-            requesting another one — new codes are rate-limited.
-          </p>
-        </BoxReveal>
+          {isVerifying ? "Verifying…" : "Verify code"}
+        </button>
       </form>
+
+      <div className="auth-actions">
+        <button
+          className="auth-switch__btn"
+          type="button"
+          onClick={handleResend}
+          disabled={cooldown > 0 || busy}
+        >
+          {isResending
+            ? "Sending…"
+            : cooldown > 0
+              ? `Resend code in ${cooldown}s`
+              : "Resend code"}
+        </button>
+        <button
+          className="auth-switch__link"
+          type="button"
+          onClick={onBack}
+          disabled={busy}
+        >
+          Use a different email
+        </button>
+      </div>
+
+      <p className="auth-footnote">
+        No code yet? Check your spam folder, or wait a minute before requesting
+        another one — new codes are rate-limited.
+      </p>
     </section>
   );
 }
