@@ -113,8 +113,9 @@ function toProjectDetail(row: Record<string, unknown>): ProjectDetail {
 export default async function ProjectDashboardPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await createClient().catch(() => null);
 
   if (!supabase) {
@@ -134,13 +135,13 @@ export default async function ProjectDashboardPage({
   const userId = (await headers()).get(USER_ID_HEADER);
   if (!userId) {
     // Middleware didn't run (should not happen) — fail closed, never open.
-    redirect(`/login?next=/projects/${params.id}`);
+    redirect(`/login?next=/projects/${id}`);
   }
 
   const { data: projectRow, error: projectError } = await supabase
     .from("projects")
     .select(PROJECT_COLUMNS)
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (projectError) {

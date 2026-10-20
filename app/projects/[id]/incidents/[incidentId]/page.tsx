@@ -85,12 +85,13 @@ function formatDuration(fromIso: string, toIso: string | null): string {
 export default async function IncidentDetailPage({
   params,
 }: {
-  params: { id: string; incidentId: string };
+  params: Promise<{ id: string; incidentId: string }>;
 }) {
+  const { id, incidentId } = await params;
   const supabase = await createClient().catch(() => null);
   if (!supabase) {
     return (
-      <Shell projectId={params.id}>
+      <Shell projectId={id}>
         <Card className="flex items-start gap-3 border-warning-border bg-warning-tint p-4">
           <TriangleAlert
             className="mt-0.5 h-4 w-4 shrink-0 text-warning"
@@ -107,19 +108,19 @@ export default async function IncidentDetailPage({
 
   const userId = (await headers()).get(USER_ID_HEADER);
   if (!userId) {
-    redirect(`/login?next=/projects/${params.id}/incidents/${params.incidentId}`);
+    redirect(`/login?next=/projects/${id}/incidents/${incidentId}`);
   }
 
   const result = await loadIncidentBundle(
     supabase,
-    params.id,
-    params.incidentId,
+    id,
+    incidentId,
   );
 
   if (!result.ok) {
     if (result.reason === "not_found") notFound();
     return (
-      <Shell projectId={params.id}>
+      <Shell projectId={id}>
         <div role="alert">
           <DatabaseSetupNotice message={result.message} />
         </div>
@@ -131,9 +132,9 @@ export default async function IncidentDetailPage({
 
 
   return (
-    <Shell projectId={params.id} projectName={bundle.project?.name ?? "Project"}>
+    <Shell projectId={id} projectName={bundle.project?.name ?? "Project"}>
       <IncidentDetailView
-        projectId={params.id}
+        projectId={id}
         incident={bundle.incident}
         serviceName={bundle.service?.name ?? null}
         phase={bundle.phase}

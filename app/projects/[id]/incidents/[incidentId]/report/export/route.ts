@@ -20,8 +20,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string; incidentId: string } },
+  { params }: { params: Promise<{ id: string; incidentId: string }> },
 ) {
+  const { id, incidentId } = await params;
   const supabase = await createClient().catch(() => null);
   if (!supabase) {
     return NextResponse.json(
@@ -37,7 +38,7 @@ export async function GET(
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const result = await loadIncidentBundle(supabase, params.id, params.incidentId);
+  const result = await loadIncidentBundle(supabase, id, incidentId);
   if (!result.ok) {
     if (result.reason === "not_found") {
       return NextResponse.json({ error: "Incident not found." }, { status: 404 });

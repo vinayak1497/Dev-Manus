@@ -7,9 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "verify": "tsc --noEmit && next lint",
+    "verify": "tsc --noEmit && npm run lint",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "test:unit": "tsc -p tsconfig.test.json && node --test \".test-build/tests/unit/*.test.js\"",
     "test": "npm run test:unit",
@@ -27,23 +27,23 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
     "motion": "^13.4.4",
-    "next": "14.2.13",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@types/node": "20.16.10",
-    "@types/react": "18.3.5",
-    "@types/react-dom": "18.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "autoprefixer": "10.4.20",
     "eslint": "8.57.1",
     "eslint-config-next": "14.2.13",
-    "postcss": "8.4.47",
+    "postcss": "8.5.31",
     "tailwindcss": "3.4.13",
     "typescript": "5.6.2"
   },
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=20.9.0"
   }
 }
