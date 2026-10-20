@@ -29,28 +29,7 @@ import {
   type ActiveIncidentView,
   type FailureGate,
 } from "./reconcile";
-
-/** Worst-first ranking used to roll individual services up to a project. */
-const HEALTH_RANK: Record<ServiceStatus, number> = {
-  critical: 5,
-  warning: 4,
-  recovering: 3,
-  maintenance: 2,
-  unknown: 1,
-  healthy: 0,
-};
-
-function rollupHealth(statuses: (ServiceStatus | null)[]): ServiceStatus | null {
-  if (statuses.length === 0) return null;
-  let worst: ServiceStatus | null = null;
-  for (const s of statuses) {
-    const status = s ?? "unknown";
-    if (worst === null || HEALTH_RANK[status] > HEALTH_RANK[worst]) {
-      worst = status;
-    }
-  }
-  return worst;
-}
+import { rollupHealth } from "./health-rollup";
 
 type ServiceRow = {
   id: string;

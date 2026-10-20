@@ -4,6 +4,13 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { buildHealthCheckUrl } from "@/lib/onboarding/health";
 import { readProjectConfig } from "@/lib/project-config-read";
+import { createClient } from "@/lib/supabase/server";
+import {
+  saveHealthConfigurationCore,
+  type HealthSaveResult,
+  type HealthSettingsInput,
+} from "@/lib/monitoring/health-edit";
+import { createSupabaseHealthEditBackend } from "@/lib/monitoring/health-edit-supabase";
 import {
   ensureMonitoredService,
   runConfiguredHttpCheckCore,
@@ -69,6 +76,54 @@ function readManualTrustedHosts(): readonly string[] {
     );
   }
   return parsed.hosts;
+}
+
+/**
+ * Persist edited health monitoring settings for one project.
+ *
+ * The save core (lib/monitoring/health-edit.ts) does the authorization,
+ * validation, merge and stale-state reset; this wrapper only supplies the
+ * cookie-scoped Supabase client and revalidates the dashboard. It is
+ * deliberately NOT the check path: saving configuration never probes the
+ * target, so a successful save can never fabricate a health observation.
+ */
+export async function saveHealthConfiguration(
+  projectId: string,
+  input: HealthSettingsInput,
+): Promise<HealthSaveResult> {
+  const supabase = await createClient().catch(() => null);
+  if (!supabase) {
+    return {
+      ok: false,
+      error:
+        "Authentication isn't configured. Add the Supabase keys to .env.local.",
+    };
+  }
+
+  let result: HealthSaveResult;
+  try {
+    result = await saveHealthConfigurationCore(
+      createSupabaseHealthEditBackend(supabase),
+      projectId,
+      input,
+    );
+  } catch (error) {
+    // A thrown network/driver error is a failed save, never a success. Log the
+    // message only — the submitted values may contain a target URL.
+    console.error(
+      "saveHealthConfiguration failed:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return {
+      ok: false,
+      error: "The health configuration could not be saved. Please retry.",
+    };
+  }
+
+  if (result.ok) {
+    revalidatePath(`/projects/${projectId}`);
+  }
+  return result;
 }
 
 export async function runConfiguredHttpCheck(

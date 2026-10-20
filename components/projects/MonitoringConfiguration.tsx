@@ -2,6 +2,7 @@ import { Activity, CalendarClock, Settings2, TriangleAlert } from "lucide-react"
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DependencyBadge } from "@/components/onboarding/ProvenanceBadge";
+import { HealthMonitoringEditor } from "@/components/projects/HealthMonitoringEditor";
 import { deploymentStrategyLabel } from "@/lib/onboarding/deployment";
 import { buildHealthCheckUrl, HEALTH_TARGET_TYPE_LABEL } from "@/lib/onboarding/health";
 import { isBlockedAddress } from "@/lib/monitoring/http-check";
@@ -79,8 +80,9 @@ function AutomaticMonitoringPanel({
           Automatic monitoring
         </h3>
         <p className="text-[13px] leading-5 text-ink-muted">
-          Not configured. Set an HTTP target URL and endpoint path in onboarding
-          to have this endpoint checked on a schedule.
+          Not configured. Set an HTTP target URL and endpoint path with
+          &ldquo;Edit health monitoring&rdquo; to have this endpoint checked on a
+          schedule.
         </p>
       </section>
     );
@@ -187,11 +189,14 @@ function AutomaticMonitoringPanel({
  *   that could be mistaken for a detected value (RULE.md §9.2).
  */
 export function MonitoringConfiguration({
+  projectId,
   config,
   automatic,
   now = Date.now(),
   activeIncidents = 0,
 }: {
+  /** Required for the health editor's authenticated save action. */
+  projectId: string;
   config: StoredProjectConfig;
   /** Real scheduler state; omitted means "automatic monitoring not inspected". */
   automatic?: AutomaticMonitoringView;
@@ -240,7 +245,8 @@ export function MonitoringConfiguration({
           </Badge>
         </div>
         <p className="text-[13px] leading-5 text-ink-secondary">
-          Exactly what onboarding stored for this project.
+          Exactly what is stored for this project. Health settings can be edited
+          below.
           {config.monitoringStatus === "pending" ? (
             <>
               {" "}
@@ -334,6 +340,7 @@ export function MonitoringConfiguration({
               No health check has been configured.
             </p>
           )}
+          <HealthMonitoringEditor projectId={projectId} health={health} />
         </section>
 
         <section>

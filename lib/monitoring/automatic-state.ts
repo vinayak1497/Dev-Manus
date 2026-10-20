@@ -24,6 +24,10 @@ import type { ServiceStatus } from "../incidents";
 import { readExternalFailureStreak } from "./failure-streak";
 import { MONITORED_SERVICE_NAME } from "./external-check";
 import { hasRunnableHttpConfig, readFailureThreshold } from "./health-settings";
+import {
+  observationMatchesHealth,
+  type ObservationMetadata,
+} from "./observation-match";
 import { readAutomaticMonitoringEnabled, readProjectConfig } from "../project-config-read";
 
 export type AutomaticMonitoringState = {
@@ -138,28 +142,35 @@ export async function readAutomaticMonitoringState(
   }
 
   if (state.serviceId) {
-    const streak = await readExternalFailureStreak(
-      supabase,
-      state.serviceId,
-      state.failureThreshold ?? 1,
-    );
-    if (streak.lastCheckedAt !== null) {
-      state.consecutiveFailures = streak.consecutiveFailures;
-      const { data: latest } = await supabase
-        .from("service_health_checks")
-        .select("metadata, detail")
-        .eq("service_id", state.serviceId)
-        .eq("source", "external")
-        .eq("is_demo", false)
-        .order("checked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest) {
-        const metadata = (latest as { metadata?: { status_code?: unknown } | null }).metadata;
-        const code = metadata?.status_code;
-        if (typeof code === "number") state.lastStatusCode = code;
-        const detail = (latest as { detail?: unknown }).detail;
-        if (typeof detail === "string") state.lastDetail = detail;
+    // The newest genuine external observation. It is only surfaced when it
+    // actually describes the configuration saved now: after an endpoint or
+    // expected-status change, the previous target's result is history, not
+    // evidence about the new target (see observation-match.ts).
+    const { data: latest } = await supabase
+      .from("service_health_checks")
+      .select("metadata, detail")
+      .eq("service_id", state.serviceId)
+      .eq("source", "external")
+      .eq("is_demo", false)
+      .order("checked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const metadata =
+      (latest as { metadata?: ObservationMetadata } | null)?.metadata ?? null;
+    if (latest && observationMatchesHealth(metadata, health)) {
+      const code = (metadata as { status_code?: unknown } | null)?.status_code;
+      if (typeof code === "number") state.lastStatusCode = code;
+      const detail = (latest as { detail?: unknown }).detail;
+      if (typeof detail === "string") state.lastDetail = detail;
+
+      const streak = await readExternalFailureStreak(
+        supabase,
+        state.serviceId,
+        state.failureThreshold ?? 1,
+      );
+      if (streak.lastCheckedAt !== null) {
+        state.consecutiveFailures = streak.consecutiveFailures;
       }
     }
   }

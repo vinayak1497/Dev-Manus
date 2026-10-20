@@ -119,6 +119,11 @@ export type MonitoredServiceRow = {
   created: boolean;
 };
 
+/** The canonical service row's human description, in one place. */
+export function monitoredServiceDescription(checkedUrl: string): string {
+  return `Configured HTTP check: ${checkedUrl}`;
+}
+
 /**
  * Find or create the canonical monitored service for a project.
  *
@@ -135,7 +140,7 @@ export async function ensureMonitoredService(
   projectId: string,
   checkedUrl: string,
 ): Promise<MonitoredServiceRow | { error: string }> {
-  const description = `Configured HTTP check: ${checkedUrl}`;
+  const description = monitoredServiceDescription(checkedUrl);
   const { data: existing } = await supabase
     .from("services")
     .select("id, description")

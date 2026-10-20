@@ -396,6 +396,7 @@ export default async function ProjectDashboardPage({
 
       {stored ? (
         <MonitoringConfiguration
+          projectId={project.id}
           config={stored}
           automatic={automatic}
           now={now}
