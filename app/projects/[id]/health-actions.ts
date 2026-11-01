@@ -144,7 +144,7 @@ export async function runConfiguredHttpCheck(
     return {
       ok: false,
       error:
-        "Automatic monitoring is not enabled for this project yet. Enable it before requesting a check; if the setting is missing, apply the monitoring migration.",
+        "Automatic monitoring could not be confirmed for this project. Enable it and ensure the monitoring migration is applied, then try again.",
     };
   }
 
