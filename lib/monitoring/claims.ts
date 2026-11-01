@@ -1,11 +1,18 @@
 /**
  * Database-backed ownership for one monitoring execution.
  *
- * The worker and the authenticated manual action use the same claim contract:
- * a service row is the lock, the lease expires, and every completion update is
- * conditional on both the run id and worker id still belonging to the caller.
- * The ownership predicate on completion is important: a slow request whose
- * lease has expired must not clear or overwrite a replacement worker's claim.
+ * The worker claims due work through this contract: a service row is the lock,
+ * the lease expires, and every completion update is conditional on both the
+ * run id and worker id still belonging to the caller. The ownership predicate
+ * on completion is important: a slow request whose lease has expired must not
+ * clear or overwrite a replacement worker's claim.
+ *
+ * The dashboard's manual "Run HTTP check" action no longer claims directly —
+ * it moves the due time to now and lets the worker claim with
+ * `claimDueCheck`, using the same lease predicate. `claimManualCheck` remains
+ * the explicit-claim primitive for callers that need to bypass the schedule
+ * while still respecting a live lease (and is exercised by the integration
+ * tests).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 

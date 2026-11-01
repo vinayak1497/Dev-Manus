@@ -125,9 +125,9 @@ export function HealthMonitoringEditor({
       ? buildHealthCheckUrl(values.targetUrl, values.endpoint).url
       : null;
 
-  // Same static check the read-back card uses: a literal private host is the
-  // case the worker's allowlist policy is most often confused about, so only
-  // then is the warning worth the space.
+  // Operator-policy note while editing. The read-back card reports the
+  // worker's persisted outcome; this form must not claim the worker is
+  // currently refusing the target.
   const privateHost = (() => {
     if (values.method !== "http") return null;
     try {
@@ -343,9 +343,12 @@ export function HealthMonitoringEditor({
                 />
                 {privateHost ? (
                   <p className="text-[12px] leading-5 text-warning">
-                    Private target ({privateHost}) can be saved, but the worker
-                    still refuses it unless that exact host is allowlisted by the
-                    operator. Entering an IP here does not grant trust.
+                    Private target ({privateHost}). The monitoring worker checks
+                    a private target only when the operator has allowlisted this
+                    exact host in MONITOR_ALLOWED_PRIVATE_HOSTS. Saving this URL
+                    does not grant trust; the worker evaluates its policy
+                    separately. Loopback, link-local and metadata addresses
+                    remain blocked even if listed.
                   </p>
                 ) : null}
                 <FieldError id="health-target-url-error" message={fieldErrors.targetUrl} />

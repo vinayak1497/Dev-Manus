@@ -1,4 +1,4 @@
-import { Activity, CalendarClock, Settings2, TriangleAlert } from "lucide-react";
+import { Activity, CalendarClock, CheckCircle2, Settings2, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DependencyBadge } from "@/components/onboarding/ProvenanceBadge";
@@ -6,6 +6,10 @@ import { HealthMonitoringEditor } from "@/components/projects/HealthMonitoringEd
 import { deploymentStrategyLabel } from "@/lib/onboarding/deployment";
 import { buildHealthCheckUrl, HEALTH_TARGET_TYPE_LABEL } from "@/lib/onboarding/health";
 import { isBlockedAddress } from "@/lib/monitoring/http-check";
+import {
+  derivePrivateTargetState,
+  type PrivateTargetState,
+} from "@/lib/monitoring/private-target-state";
 import type { DependencyStatus, HealthTargetType } from "@/lib/onboarding/types";
 import { formatRelativeTime } from "@/lib/projects";
 import type { AutomaticMonitoringView } from "@/lib/monitoring/automatic-state";
@@ -179,6 +183,65 @@ function AutomaticMonitoringPanel({
 }
 
 /**
+ * The private-target note is a report about persisted worker outcomes, not a
+ * prediction about the current allowlist. It deliberately never says a host is
+ * "trusted": a successful check is evidence that the worker could fetch the
+ * target at that time, not proof that the operator still allows it.
+ */
+function PrivateTargetNote({ state }: { state: PrivateTargetState }) {
+  if (state.kind === "checked") {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-ink-secondary">
+        <CheckCircle2
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success"
+          aria-hidden="true"
+        />
+        Private target ({state.host}): the latest worker check succeeded
+        {state.statusCode !== null ? ` (HTTP ${state.statusCode})` : ""}. This is
+        the worker&apos;s observed result, not proof that the host is currently
+        allowlisted; the operator policy in MONITOR_ALLOWED_PRIVATE_HOSTS remains
+        the only way it can be checked.
+      </p>
+    );
+  }
+
+  if (state.kind === "refused") {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        Private target ({state.host}): the worker refused the check —{" "}
+        {state.error} If this is an eligible private address, add this exact host
+        to MONITOR_ALLOWED_PRIVATE_HOSTS on the worker host. Loopback, link-local
+        and metadata addresses cannot be allowlisted.
+      </p>
+    );
+  }
+
+  if (state.kind === "failed") {
+    const reason = state.error ?? state.detail ?? "no detail was recorded";
+    return (
+      <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        Private target ({state.host}): the worker&apos;s latest check did not
+        succeed — {reason}. This is a check result, not a statement about the
+        allowlist.
+      </p>
+    );
+  }
+
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
+      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      Private target ({state.host}): no worker check has been recorded for this
+      configuration yet. The worker checks it only if the operator has
+      allowlisted this exact host in MONITOR_ALLOWED_PRIVATE_HOSTS. Only an
+      eligible private address can be allowlisted; loopback, link-local and
+      metadata addresses remain permanently blocked.
+    </p>
+  );
+}
+
+/**
  * "What did onboarding actually store?" — the read-back half of the
  * UI → state → persistence → Supabase loop.
  *
@@ -209,16 +272,17 @@ export function MonitoringConfiguration({
   const runtime = config.runtime;
 
   const checkUrl = health && health.method === "http" ? buildHealthCheckUrl(health.targetUrl ?? "", health.endpoint ?? "").url : null;
-  // Static (no-DNS) eligibility hint: a private/internal literal can only be
-  // fetched when the worker host explicitly trusts that exact host via
-  // MONITOR_ALLOWED_PRIVATE_HOSTS. Entering the IP in onboarding does NOT
-  // trust it — this note must never read as "will be monitored".
-  const privateTargetNote = (() => {
+  // Static (no-DNS) private-literal detection plus the latest persisted worker
+  // outcome. This never reads or exposes the worker's allowlist: a successful
+  // check is reported as "checked", not as proof that the host is trusted, and
+  // a refusal is reported from the worker's own error. Entering a private IP in
+  // onboarding does not grant trust.
+  const privateTargetState = (() => {
     if (!health || health.method !== "http" || !health.targetUrl) return null;
     try {
       const hostname = new URL(health.targetUrl).hostname;
       if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) && isBlockedAddress(hostname)) {
-        return hostname;
+        return derivePrivateTargetState(hostname, automatic);
       }
       return null;
     } catch {
@@ -305,14 +369,8 @@ export function MonitoringConfiguration({
                   <Row label="Target URL" value={health.targetUrl ?? "Not set"} />
                   <Row label="Endpoint path" value={health.endpoint ?? "Not set"} />
                   <Row label="Checked URL" value={checkUrl ?? "Not set"} />
-                  {privateTargetNote ? (
-                    <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-5 text-warning">
-                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      Private target ({privateTargetNote}): the worker refuses
-                      it unless that exact host is listed in
-                      MONITOR_ALLOWED_PRIVATE_HOSTS on the worker host. Until
-                      then, checks are refused and no incident can be created.
-                    </p>
+                  {privateTargetState ? (
+                    <PrivateTargetNote state={privateTargetState} />
                   ) : null}
                 </>
               ) : (

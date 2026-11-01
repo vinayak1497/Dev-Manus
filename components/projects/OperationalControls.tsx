@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Boxes,
@@ -21,10 +21,13 @@ import type { ActionResult } from "@/app/projects/[id]/incidents/actions";
 
 /**
  * Operational controls on the project dashboard. "Run monitor check" runs one
- * real detection pass in any environment. The demo controls (set up services,
- * simulate a controlled failure) are dev/demo only and clearly labelled — the
- * simulation writes an unhealthy OBSERVATION and lets detection decide, so the
- * flow stays OBSERVE → DETECT, never BUTTON → INCIDENT.
+ * real detection pass in any environment. "Run HTTP check" only QUEUES the
+ * configured probe for the monitoring worker: private-target policy lives in
+ * the worker, so the browser process must never fetch the target. The demo
+ * controls (set up services, simulate a controlled failure) are dev/demo only
+ * and clearly labelled — the simulation writes an unhealthy OBSERVATION and
+ * lets detection decide, so the flow stays OBSERVE → DETECT, never BUTTON →
+ * INCIDENT.
  */
 export function OperationalControls({
   projectId,
@@ -40,11 +43,22 @@ export function OperationalControls({
   const [pending, startTransition] = useTransition();
   const [op, setOp] = useState<null | "setup" | "simulate" | "monitor" | "http">(null);
   const [result, setResult] = useState<ActionResult | null>(null);
+  const pollTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearPollTimers = useCallback(() => {
+    for (const timer of pollTimers.current) clearTimeout(timer);
+    pollTimers.current = [];
+  }, []);
+
+  // A queued check is completed by the worker, not by this component. Drop
+  // any remaining refresh timers if the dashboard unmounts first.
+  useEffect(() => () => clearPollTimers(), [clearPollTimers]);
 
   const run = (
     which: "setup" | "simulate" | "monitor" | "http",
     fn: () => Promise<ActionResult>,
   ) => {
+    clearPollTimers();
     setOp(which);
     setResult(null);
     startTransition(async () => {
@@ -53,7 +67,15 @@ export function OperationalControls({
       setOp(null);
       if (res.ok) {
         router.refresh();
-        if ((which === "simulate" || which === "http") && res.incidentId) {
+        if (which === "http") {
+          // The worker writes the real observation asynchronously. Refresh at
+          // bounded checkpoints, then stop; the Automatic monitoring panel
+          // displays whatever the worker actually recorded.
+          pollTimers.current = [2000, 5000, 10000, 20000].map((delay) =>
+            setTimeout(() => router.refresh(), delay),
+          );
+        }
+        if (which === "simulate" && res.incidentId) {
           router.push(`/projects/${projectId}/incidents/${res.incidentId}`);
         }
       }
@@ -85,7 +107,7 @@ export function OperationalControls({
         ) : null}
         <span className="text-[12px] text-ink-muted">
           {canRunConfiguredCheck
-            ? "Runs the configured HTTP check now and records the result."
+            ? "Queues the configured HTTP check for the monitoring worker to run now."
             : "Runs one real detection pass over this project now."}
         </span>
       </div>
