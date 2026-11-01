@@ -44,6 +44,7 @@ export function OperationalControls({
   const [op, setOp] = useState<null | "setup" | "simulate" | "monitor" | "http">(null);
   const [result, setResult] = useState<ActionResult | null>(null);
   const pollTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const mounted = useRef(true);
 
   const clearPollTimers = useCallback(() => {
     for (const timer of pollTimers.current) clearTimeout(timer);
@@ -51,8 +52,15 @@ export function OperationalControls({
   }, []);
 
   // A queued check is completed by the worker, not by this component. Drop
-  // any remaining refresh timers if the dashboard unmounts first.
-  useEffect(() => () => clearPollTimers(), [clearPollTimers]);
+  // any remaining refresh timers if the dashboard unmounts first, and do not
+  // schedule new ones after an in-flight request resolves post-unmount.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearPollTimers();
+    };
+  }, [clearPollTimers]);
 
   const run = (
     which: "setup" | "simulate" | "monitor" | "http",
@@ -63,6 +71,7 @@ export function OperationalControls({
     setResult(null);
     startTransition(async () => {
       const res = await fn();
+      if (!mounted.current) return;
       setResult(res);
       setOp(null);
       if (res.ok) {
@@ -107,7 +116,7 @@ export function OperationalControls({
         ) : null}
         <span className="text-[12px] text-ink-muted">
           {canRunConfiguredCheck
-            ? "Queues the configured HTTP check for the monitoring worker to run now."
+            ? "Queues the configured HTTP check for the monitoring worker."
             : "Runs one real detection pass over this project now."}
         </span>
       </div>
