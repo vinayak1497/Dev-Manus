@@ -28,6 +28,12 @@ export type ActionResult = {
   error?: string;
   message?: string;
   incidentId?: string;
+  /**
+   * For async work (currently the manual HTTP check): the server timestamp
+   * written as the queue token. The dashboard uses it to prove the worker
+   * consumed that specific request instead of clearing on a bare refresh.
+   */
+  queuedAt?: string;
 };
 
 type Authed = { supabase: SupabaseClient; userId: string };

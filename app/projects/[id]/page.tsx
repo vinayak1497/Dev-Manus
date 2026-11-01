@@ -421,6 +421,17 @@ export default async function ProjectDashboardPage({
               stored?.health?.method === "http" &&
               !!(stored.health.targetUrl && stored.health.endpoint)
             }
+            // Persisted worker state used to prove the queued request was
+            // consumed. Booleans only: the full observation/error text stays
+            // in the server-rendered Automatic monitoring panel.
+            checkSignal={{
+              nextCheckAt: automatic.nextCheckAt,
+              hasMatchingObservation: automatic.lastDetail !== null,
+              hasError: automatic.lastError !== null,
+            }}
+            // Changes on every server render, so the client can distinguish
+            // the pre-request render from a post-refresh one.
+            renderedAt={now}
           />
         </Card>
       )}

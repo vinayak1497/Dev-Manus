@@ -18,6 +18,10 @@ import {
 } from "@/app/projects/[id]/incidents/actions";
 import { runConfiguredHttpCheck } from "@/app/projects/[id]/health-actions";
 import type { ActionResult } from "@/app/projects/[id]/incidents/actions";
+import {
+  deriveManualCheckCompletion,
+  type ManualCheckSignal,
+} from "@/lib/monitoring/manual-check-completion";
 
 /**
  * Operational controls on the project dashboard. "Run monitor check" runs one
@@ -33,18 +37,37 @@ export function OperationalControls({
   projectId,
   devMode,
   canRunConfiguredCheck,
+  checkSignal,
+  renderedAt,
 }: {
   projectId: string;
   devMode: boolean;
   /** True when onboarding stored an HTTP target + endpoint for this project. */
   canRunConfiguredCheck: boolean;
+  /** Persisted worker state used to prove the queued request finished. */
+  checkSignal: ManualCheckSignal;
+  /** Server render time; changes after router.refresh(). */
+  renderedAt: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [op, setOp] = useState<null | "setup" | "simulate" | "monitor" | "http">(null);
   const [result, setResult] = useState<ActionResult | null>(null);
+  const [queuedCheck, setQueuedCheck] = useState<{
+    queuedAt: string;
+    baselineRenderedAt: number;
+    message: string;
+  } | null>(null);
   const pollTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const mounted = useRef(true);
+  const latestRenderedAt = useRef(renderedAt);
+
+  // Track the latest committed render. The action response can arrive while a
+  // refresh is in flight; using that render as the baseline guarantees the
+  // completion check only runs on a later render.
+  useEffect(() => {
+    latestRenderedAt.current = renderedAt;
+  }, [renderedAt]);
 
   const clearPollTimers = useCallback(() => {
     for (const timer of pollTimers.current) clearTimeout(timer);
@@ -62,6 +85,29 @@ export function OperationalControls({
     };
   }, [clearPollTimers]);
 
+  // A refresh alone is not completion. Only clear the queued confirmation when
+  // the persisted due time has moved away from the exact token the action
+  // wrote, and only on a render that happened after the action response.
+  useEffect(() => {
+    if (!queuedCheck) return;
+    if (renderedAt === queuedCheck.baselineRenderedAt) return;
+    if (
+      deriveManualCheckCompletion(queuedCheck.queuedAt, checkSignal).state !==
+      "completed"
+    ) {
+      return;
+    }
+    clearPollTimers();
+    setQueuedCheck(null);
+  }, [queuedCheck, renderedAt, checkSignal, clearPollTimers]);
+
+  const queuedCompletion =
+    queuedCheck && renderedAt !== queuedCheck.baselineRenderedAt
+      ? deriveManualCheckCompletion(queuedCheck.queuedAt, checkSignal)
+      : null;
+  const showQueued =
+    queuedCheck !== null && queuedCompletion?.state !== "completed";
+
   const run = (
     which: "setup" | "simulate" | "monitor" | "http",
     fn: () => Promise<ActionResult>,
@@ -69,17 +115,34 @@ export function OperationalControls({
     clearPollTimers();
     setOp(which);
     setResult(null);
+    setQueuedCheck(null);
     startTransition(async () => {
       const res = await fn();
       if (!mounted.current) return;
-      setResult(res);
+      const queuedAt = which === "http" && res.ok ? res.queuedAt : undefined;
+      if (queuedAt) {
+        setQueuedCheck({
+          queuedAt,
+          // Capture the latest render at response time. Any later render is
+          // guaranteed to be after the queue write, so it can be evaluated.
+          baselineRenderedAt: latestRenderedAt.current,
+          message:
+            res.message ??
+            "Check queued — the monitoring worker will run it on its next pass.",
+        });
+        setResult(null);
+      } else {
+        setResult(res);
+        setQueuedCheck(null);
+      }
       setOp(null);
       if (res.ok) {
         router.refresh();
         if (which === "http") {
           // The worker writes the real observation asynchronously. Refresh at
-          // bounded checkpoints, then stop; the Automatic monitoring panel
-          // displays whatever the worker actually recorded.
+          // bounded checkpoints, then stop; the completion effect clears the
+          // queued message and any remaining timers once the persisted due
+          // time moves. The Automatic monitoring panel displays the result.
           pollTimers.current = [2000, 5000, 10000, 20000].map((delay) =>
             setTimeout(() => router.refresh(), delay),
           );
@@ -161,7 +224,18 @@ export function OperationalControls({
         </div>
       ) : null}
 
-      {result ? (
+      {showQueued && queuedCheck ? (
+        <p
+          role="status"
+          className="inline-flex items-start gap-1.5 text-[12px] leading-5 text-ink-secondary"
+        >
+          <CheckCircle2
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success"
+            aria-hidden="true"
+          />
+          {queuedCheck.message}
+        </p>
+      ) : result ? (
         <p
           role={result.ok ? "status" : "alert"}
           className={`inline-flex items-start gap-1.5 text-[12px] leading-5 ${

@@ -187,6 +187,10 @@ export async function runConfiguredHttpCheck(
   revalidatePath(`/projects/${projectId}`);
   return {
     ok: true,
+    // The exact value written to monitoring_next_check_at. The dashboard
+    // compares this token with the persisted due time after each refresh:
+    // while they match, the worker has not consumed the request yet.
+    queuedAt: nowIso,
     message:
       "Check queued — the monitoring worker will run it on its next pass. The result will appear in Automatic monitoring.",
   };
