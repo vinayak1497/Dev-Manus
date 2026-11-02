@@ -17,39 +17,22 @@ import type {
   IncidentAnalysisInput,
 } from "../types";
 import { parseIncidentAnalysis } from "../schema";
-import { REMEDIATION_ACTION_TYPES } from "../../remediation/actions";
+import {
+  SYSTEM_PROMPT,
+  extractJson,
+  providerInputMessage,
+  readMaxOutputTokens,
+  readTemperature,
+  readTimeoutMs,
+} from "./shared";
 
 const ENDPOINT = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = "claude-sonnet-5";
-const TIMEOUT_MS = 20_000;
-
-const SYSTEM_PROMPT = [
-  "You are an incident-analysis assistant for an SRE tool.",
-  "You receive ONLY the structured evidence provided in the user message.",
-  "Use only the supplied evidence. Do not invent logs, metrics, deployments, timestamps, services, or events.",
-  "If the evidence is insufficient to determine a cause, set insufficientEvidence to true and say so plainly in interpretation.",
-  "Correlation is not causation: never state that a deployment or change 'caused' the incident unless the evidence establishes it; prefer wording like 'occurred shortly before'.",
-  "Respond with a SINGLE JSON object and nothing else (no prose, no code fences) matching exactly:",
-  '{"observation":string,"evidence":[{"source":string,"timestamp":string|null,"statement":string}],"interpretation":string,"confidence":"low"|"medium"|"high","suggestedActions":[{"title":string,"description":string,"risk":"low"|"medium"|"high","actionType"?:string}],"insufficientEvidence":boolean}',
-  `Every evidence[].statement must restate a supplied fact. actionType, when present, MUST be one of: ${REMEDIATION_ACTION_TYPES.join(", ")}.`,
-].join(" ");
-
-/** Pull the first JSON object out of a model response, tolerating fences. */
-function extractJson(text: string): unknown {
-  const trimmed = text.trim();
-  const fenced = trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-  const start = fenced.indexOf("{");
-  const end = fenced.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error("no JSON object in model response");
-  }
-  return JSON.parse(fenced.slice(start, end + 1));
-}
 
 export class AnthropicProvider implements AIProvider {
   readonly name = "anthropic";
+  readonly model: string;
   private readonly apiKey: string;
-  private readonly model: string;
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
@@ -67,7 +50,7 @@ export class AnthropicProvider implements AIProvider {
     input: IncidentAnalysisInput,
   ): Promise<IncidentAnalysis> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), readTimeoutMs());
     let res: Response;
     try {
       res = await fetch(ENDPOINT, {
@@ -80,12 +63,13 @@ export class AnthropicProvider implements AIProvider {
         },
         body: JSON.stringify({
           model: this.model,
-          max_tokens: 1024,
+          max_tokens: readMaxOutputTokens(),
+          temperature: readTemperature(),
           system: SYSTEM_PROMPT,
           messages: [
             {
               role: "user",
-              content: `Incident evidence (JSON):\n${JSON.stringify(input)}`,
+              content: providerInputMessage(input),
             },
           ],
         }),

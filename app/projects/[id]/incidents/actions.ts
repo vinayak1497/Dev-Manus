@@ -351,7 +351,10 @@ export async function runProjectMonitor(projectId: string): Promise<ActionResult
 }
 
 /** Generate (or refresh) the read-only AI analysis for an incident (§11-13). */
-export async function generateAnalysis(incidentId: string): Promise<ActionResult> {
+export async function generateAnalysis(
+  incidentId: string,
+  mode: "manual" | "auto" = "manual",
+): Promise<ActionResult> {
   const auth = await authed();
   if (!auth.ok) return auth;
   const { supabase, userId } = auth.ctx;
@@ -359,7 +362,9 @@ export async function generateAnalysis(incidentId: string): Promise<ActionResult
   const projectId = await incidentProject(supabase, incidentId);
   if (!projectId) return { ok: false, error: "Incident not found." };
 
-  const result = await generateIncidentAnalysis(supabase, incidentId, userId);
+  const result = await generateIncidentAnalysis(supabase, incidentId, userId, {
+    advanceStatus: mode === "manual",
+  });
   if (!result.ok) {
     return { ok: false, error: result.error ?? "Analysis could not be generated." };
   }

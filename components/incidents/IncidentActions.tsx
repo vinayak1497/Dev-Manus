@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -14,31 +14,56 @@ import type { ActionResult } from "@/app/projects/[id]/incidents/actions";
  * Top-of-incident controls: (re)generate the read-only AI analysis and run an
  * on-demand detection pass. Both call server actions inside a transition and
  * refresh the server component so the page reflects the new DB state.
+ *
+ * When an incident has no stored analysis (for example, one opened by the
+ * unattended monitor), this component asks the server to generate one on first
+ * view. The action is idempotent from the user's perspective: once a validated
+ * row exists the page renders it and this effect does not run again.
  */
 export function IncidentActions({
   projectId,
   incidentId,
   hasAnalysis,
+  autoGenerate = true,
 }: {
   projectId: string;
   incidentId: string;
   hasAnalysis: boolean;
+  autoGenerate?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<null | "analyze" | "monitor">(null);
   const [result, setResult] = useState<ActionResult | null>(null);
+  const autoStarted = useRef(false);
 
-  const run = (which: "analyze" | "monitor", fn: () => Promise<ActionResult>) => {
-    setBusy(which);
-    setResult(null);
-    startTransition(async () => {
-      const res = await fn();
-      setResult(res);
-      setBusy(null);
-      if (res.ok) router.refresh();
-    });
-  };
+  const run = useCallback(
+    (which: "analyze" | "monitor", fn: () => Promise<ActionResult>) => {
+      setBusy(which);
+      setResult(null);
+      startTransition(async () => {
+        try {
+          const res = await fn();
+          setResult(res);
+          if (res.ok) router.refresh();
+        } catch {
+          setResult({
+            ok: false,
+            error: "The operation could not be completed. Please try again.",
+          });
+        } finally {
+          setBusy(null);
+        }
+      });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (!autoGenerate || hasAnalysis || autoStarted.current) return;
+    autoStarted.current = true;
+    run("analyze", () => generateAnalysis(incidentId, "auto"));
+  }, [autoGenerate, hasAnalysis, incidentId, run]);
 
   return (
     <div className="flex flex-col gap-2">

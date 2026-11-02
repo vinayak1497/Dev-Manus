@@ -61,6 +61,7 @@ export async function generateIncidentAnalysis(
   supabase: SupabaseClient,
   incidentId: string,
   userId: string | null,
+  options: { advanceStatus?: boolean } = {},
 ): Promise<GenerateAnalysisResult> {
   const { data: incidentData } = await supabase
     .from("incidents")
@@ -164,7 +165,7 @@ export async function generateIncidentAnalysis(
       : null,
   };
 
-  const { analysis, provider, usedFallback } = await analyzeIncident(input);
+  const { analysis, provider, model, usedFallback } = await analyzeIncident(input);
 
   // __ANALYZE_STORE__
   // Persist the validated analysis. We never store or render raw model JSON as
@@ -175,6 +176,7 @@ export async function generateIncidentAnalysis(
     .insert({
       incident_id: incidentId,
       provider,
+      model: model ?? null,
       observation: analysis.observation,
       interpretation: analysis.interpretation,
       confidence: analysis.confidence,
@@ -253,10 +255,14 @@ export async function generateIncidentAnalysis(
   }
 
   // Move the incident forward, but never regress a monitoring/resolved one.
+  // Auto-generated analyses (first view of an incident) are read-only with
+  // respect to lifecycle state: simply opening a page must not silently move an
+  // incident out of `open`.
   if (
-    incident.status === "open" ||
-    incident.status === "investigating" ||
-    incident.status === "identified"
+    options.advanceStatus !== false &&
+    (incident.status === "open" ||
+      incident.status === "investigating" ||
+      incident.status === "identified")
   ) {
     const nextStatus = proposedCount > 0 ? "identified" : "investigating";
     if (nextStatus !== incident.status) {

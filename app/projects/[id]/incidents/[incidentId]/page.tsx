@@ -480,6 +480,7 @@ function AiAnalysisPanel({
             {analysis.provider ? (
               <span className="font-mono text-[11px] text-ink-muted">
                 {analysis.provider}
+                {analysis.model ? ` · ${analysis.model}` : ""}
               </span>
             ) : null}
           </span>
@@ -549,6 +550,13 @@ function AiAnalysisBody({
     : [];
   return (
     <div className="flex flex-col gap-5">
+      {analysis.provider === "deterministic-rules" ? (
+        <p className="rounded-md border border-border-hairline bg-subtle px-3 py-2 text-[12px] leading-5 text-ink-muted">
+          No live AI provider key is configured, so this summary uses the
+          deterministic rules fallback. Add a Google, OpenAI, DeepSeek, or
+          Anthropic key on the server to use a live model.
+        </p>
+      ) : null}
       <AiField title="Observation" body={analysis.observation} />
       {refs.length > 0 ? (
         <div className="flex flex-col gap-2">

@@ -76,5 +76,7 @@ export type IncidentAnalysis = {
 export interface AIProvider {
   /** Stable identifier for logging (never logs keys/prompts). */
   readonly name: string;
+  /** Model identifier, when the provider uses one (never a secret). */
+  readonly model?: string;
   analyzeIncident(input: IncidentAnalysisInput): Promise<IncidentAnalysis>;
 }
